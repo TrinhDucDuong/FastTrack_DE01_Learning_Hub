@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Quiz và bài thi tổng hợp cho FastTrack DE01 Learning Hub.">
+  <title>Quiz · FastTrack DE01 Learning Hub</title>
+  <link rel="stylesheet" href="assets/quiz.css">
+</head>
+<body>
+  <header class="quiz-topbar">
+    <a href="index.html" class="back">← Learning Hub</a>
+    <strong id="topTitle">Quiz DE01</strong>
+    <button id="theme" type="button" aria-label="Đổi giao diện">◐</button>
+  </header>
+
+  <main class="quiz-shell">
+    <section class="quiz-intro" id="quizIntro">
+      <p class="eyebrow" id="modeLabel">Kiểm tra kiến thức</p>
+      <h1 id="quizTitle">Đang tải câu hỏi…</h1>
+      <p id="quizDescription"></p>
+      <div class="quiz-meta" id="quizMeta"></div>
+    </section>
+
+    <section class="quiz-layout" id="quizView" hidden>
+      <aside class="question-sidebar">
+        <p class="side-label">Câu hỏi</p>
+        <nav class="question-palette" id="questionPalette" aria-label="Danh sách câu hỏi"></nav>
+        <div class="legend"><span><i class="answered"></i>Đã trả lời</span><span><i></i>Chưa trả lời</span></div>
+      </aside>
+
+      <section class="question-card" aria-live="polite">
+        <div class="question-head">
+          <span id="questionCounter"></span>
+          <span class="topic" id="questionTopic"></span>
+        </div>
+        <h2 id="questionPrompt"></h2>
+        <fieldset id="choices"><legend class="sr-only">Chọn một đáp án</legend></fieldset>
+        <div class="quiz-actions">
+          <button class="button secondary" id="previous" type="button">← Câu trước</button>
+          <button class="button secondary" id="next" type="button">Câu tiếp →</button>
+          <button class="button primary" id="submit" type="button">Nộp bài</button>
+        </div>
+        <p class="validation" id="validation" role="status"></p>
+      </section>
+    </section>
+
+    <section class="result" id="resultView" hidden>
+      <p class="eyebrow">Kết quả</p>
+      <div class="score-ring" id="scoreRing"><strong id="scorePercent">0%</strong><span id="scoreFraction"></span></div>
+      <h1 id="resultTitle"></h1>
+      <p id="resultMessage"></p>
+      <div class="result-actions">
+        <button class="button primary" id="reviewButton" type="button">Xem lại đáp án</button>
+        <a class="button secondary" id="retryIncorrect" href="#" hidden>Làm lại câu sai</a>
+        <a class="button secondary" id="restartLink" href="quiz.html">Làm lại</a>
+        <a class="button secondary" href="progress.html">Xem thống kê</a>
+        <a class="button secondary" href="index.html">Về Learning Hub</a>
+      </div>
+      <div class="review-list" id="reviewList" hidden></div>
+    </section>
+
+    <section class="error-panel" id="errorView" hidden>
+      <h1>Không thể tải bài kiểm tra</h1>
+      <p id="errorMessage"></p>
+      <a class="button primary" href="index.html">Về Learning Hub</a>
+    </section>
+  </main>
+
+  <script src="assets/question-bank.js"></script>
+  <script src="assets/question-loader.js"></script>
+  <script src="assets/quiz-engine.js"></script>
+  <script src="assets/quiz-storage.js"></script>
+  <script src="assets/quiz-app.js"></script>
+</body>
+</html>

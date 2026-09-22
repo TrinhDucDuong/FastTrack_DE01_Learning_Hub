@@ -4,6 +4,14 @@
   const saved=new Set(JSON.parse(localStorage.getItem('de01-progress')||'[]'));
   const button=document.getElementById('doneButton');
   const fill=document.getElementById('courseProgress');
+  const meta=document.querySelector('.lesson-meta');
+  if(meta&&unit){
+    const quizLink=document.createElement('a');
+    quizLink.className='pill quiz-pill';
+    quizLink.href='../quiz.html?mode=lesson&unit='+unit;
+    quizLink.textContent='Làm quiz Unit '+unit+' →';
+    meta.appendChild(quizLink);
+  }
   function renderProgress(){
     const done=saved.has(unit);
     button.textContent=done?'✓ Đã hoàn thành':'○ Đánh dấu đã học';

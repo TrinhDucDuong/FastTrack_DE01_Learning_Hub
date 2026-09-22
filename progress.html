@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Lịch sử, thống kê và chủ đề cần ôn của FastTrack DE01.">
+  <title>Tiến trình Quiz · FastTrack DE01</title>
+  <link rel="stylesheet" href="assets/quiz.css">
+</head>
+<body>
+  <header class="quiz-topbar"><a href="index.html" class="back">← Learning Hub</a><strong>Tiến trình Quiz</strong><button id="theme" type="button" aria-label="Đổi giao diện">◐</button></header>
+  <main class="quiz-shell stats-page">
+    <section class="quiz-intro"><p class="eyebrow">Learning analytics</p><h1>Kết quả &amp; chủ đề cần ôn</h1><p>Dữ liệu chỉ được lưu trong localStorage của trình duyệt hiện tại.</p></section>
+    <section class="stats-grid" id="summaryCards"></section>
+    <section class="stats-section"><h2>Độ chính xác theo unit</h2><div class="unit-stats" id="unitStats"></div></section>
+    <section class="stats-section"><h2>Weak topics</h2><p class="section-copy">Chỉ đánh dấu khi topic đã được trả lời ít nhất hai lần và độ chính xác dưới 70%.</p><div id="weakTopics"></div></section>
+    <section class="stats-section"><h2>Lịch sử làm bài</h2><div class="history-list" id="historyList"></div></section>
+  </main>
+  <script src="assets/quiz-storage.js"></script>
+  <script src="assets/progress-app.js"></script>
+</body>
+</html>
