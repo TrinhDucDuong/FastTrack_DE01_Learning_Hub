@@ -1,15 +1,17 @@
 (function (root, factory) {
-  const bank = factory();
+  const bank = factory(
+    typeof module === 'object' && module.exports ? require('./question-bank-extra.js') : root.DE01_EXTRA_QUESTIONS
+  );
   if (typeof module === 'object' && module.exports) module.exports = bank;
   else root.DE01_QUESTION_BANK = bank;
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (extraQuestions) {
   'use strict';
   function choices() {
     return Array.from(arguments).map(function (text, index) {
       return { id: String.fromCharCode(97 + index), text: text };
     });
   }
-  return [
+  const bank = [
     {id:'u01-q001',unit:1,topic:'git-history',difficulty:'basic',prompt:'Lệnh nào cập nhật remote-tracking branch mà chưa nhập thay đổi vào working branch hiện tại?',choices:choices('git pull','git fetch','git merge','git push'),answer:'b',explanation:'git fetch tải refs và objects từ remote nhưng không merge hoặc rebase branch đang làm việc.',lessonUrl:'lessons/unit-01.html#10-fetch-pull-va-push-theo-vi-du'},
     {id:'u01-q002',unit:1,topic:'git-recovery',difficulty:'applied',prompt:'Một commit lỗi đã được push lên nhánh main dùng chung. Cách đảo thay đổi an toàn nhất là gì?',choices:choices('git reset --hard','Xóa repository rồi clone lại','git revert commit-id','Force-push commit cha'),answer:'c',explanation:'git revert tạo một commit mới đảo thay đổi, giữ lịch sử dùng chung và audit trail.',lessonUrl:'lessons/unit-01.html#12-tinh-huong-production'},
 
@@ -136,4 +138,5 @@
     {id:'u18-q004',unit:18,topic:'architecture-review',difficulty:'applied',prompt:'Khi review kiến trúc, câu hỏi nào làm rõ reliability tốt nhất?',choices:choices('Sơ đồ dùng font gì?','Nếu job chết sau khi ghi một phần, hệ thống phát hiện, retry và reconcile thế nào?','Có bao nhiêu logo cloud?','Tên project có hấp dẫn không?'),answer:'b',explanation:'Câu hỏi failure-oriented buộc thiết kế nêu transaction boundary, idempotency, observability và recovery thay vì chỉ mô tả happy path.',lessonUrl:'lessons/unit-18.html#12-architecture-review-checklist'},
     {id:'u18-q005',unit:18,topic:'trade-off',difficulty:'basic',prompt:'Một câu trả lời kỹ thuật thuyết phục nên nói về trade-off như thế nào?',choices:choices('Khẳng định lựa chọn không có nhược điểm','Nêu lợi ích, chi phí/rủi ro và điều kiện khiến lựa chọn thay đổi','Chỉ đọc tên dịch vụ','Tránh đề cập limitation'),answer:'b',explanation:'Trade-off cho thấy quyết định gắn với context và constraint; một lựa chọn tốt trong bối cảnh này có thể không phù hợp khi quy mô/SLO thay đổi.',lessonUrl:'lessons/unit-18.html#5-cach-tra-loi-q-a-ky-thuat'}
   ];
+  return bank.concat(extraQuestions || []);
 }));

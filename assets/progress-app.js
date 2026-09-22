@@ -30,7 +30,7 @@
   const list = document.getElementById('historyList');
   list.innerHTML = history.length ? history.map(function (attempt) {
     const incorrect = attempt.items.filter(function (item) { return !item.correct; }).length;
-    const label = attempt.mode === 'exam' ? 'Full-course exam' : attempt.mode === 'retry' ? 'Retry câu sai' : 'Quiz Unit ' + String(attempt.unit).padStart(2, '0');
+    const label = attempt.mode === 'exam' ? 'Full-course exam · ' + attempt.total + ' câu' : attempt.mode === 'retry' ? 'Retry câu sai' : 'Quiz Unit ' + String(attempt.unit).padStart(2, '0');
     const retry = incorrect ? '<a href="quiz.html?mode=retry&attempt=' + encodeURIComponent(attempt.id) + '">Làm lại ' + incorrect + ' câu sai →</a>' : '<span>Không có câu sai</span>';
     return '<article class="history-item"><div><b>' + label + '</b><span>' + new Date(attempt.submittedAt).toLocaleString('vi-VN') + '</span></div><strong>' + attempt.percentage + '%</strong>' + retry + '</article>';
   }).join('') : '<div class="empty-state">Chưa có kết quả. Hãy làm quiz ở một lesson hoặc thi thử toàn khóa.</div>';

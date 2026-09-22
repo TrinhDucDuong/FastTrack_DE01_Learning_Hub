@@ -3,8 +3,9 @@
 
   const params = new URLSearchParams(window.location.search);
   const requestedMode = params.get('mode');
-  const mode = ['lesson', 'exam', 'retry'].includes(requestedMode) ? requestedMode : 'lesson';
+  const mode = ['lesson', 'exam', 'retry'].includes(requestedMode) ? requestedMode : 'setup';
   const unit = Number(params.get('unit'));
+  const examCount = Math.max(1, Math.min(Math.floor(Number(params.get('count')) || 40), 360));
   const sourceAttemptId = params.get('attempt');
   const forceRestart = params.get('restart') === '1';
   const loader = window.DE01QuestionLoader;
@@ -16,6 +17,7 @@
   let result = null;
 
   const els = {
+    setup: document.getElementById('quizSetup'),
     topTitle: document.getElementById('topTitle'), modeLabel: document.getElementById('modeLabel'),
     title: document.getElementById('quizTitle'), description: document.getElementById('quizDescription'),
     meta: document.getElementById('quizMeta'), quizView: document.getElementById('quizView'),
@@ -33,6 +35,7 @@
   };
 
   function fail(message) {
+    els.setup.hidden = true;
     els.quizView.hidden = true;
     document.getElementById('quizIntro').hidden = true;
     els.errorMessage.textContent = message;
@@ -164,6 +167,26 @@
 
   const validation = loader.validateBank();
   if (!validation.valid) { fail('Ngân hàng câu hỏi không hợp lệ: ' + validation.errors[0]); return; }
+  if (mode === 'setup') {
+    const lessonTitles = [
+      'Git & collaboration', 'Python for Data Engineering', 'SQL & relational database', 'API & FastAPI',
+      'Data Warehouse & dimensional modeling', 'Python pipeline engineering', 'Apache Spark', 'dbt & analytics engineering',
+      'Azure fundamentals', 'Cloud storage & data lake', 'Batch pipeline & Azure Data Factory', 'Streaming & Event Hubs',
+      'Observability & incident response', 'Apache Airflow', 'Governance & security', 'DataOps & CI/CD',
+      'Capstone implementation', 'Review, report & technical defense'
+    ];
+    const lessonSelect = document.getElementById('lessonUnit');
+    lessonTitles.forEach(function (title, index) {
+      const option = document.createElement('option');
+      option.value = index + 1;
+      option.textContent = 'Unit ' + String(index + 1).padStart(2, '0') + ' · ' + title;
+      lessonSelect.appendChild(option);
+    });
+    document.getElementById('quizIntro').hidden = true;
+    els.setup.hidden = false;
+    els.topTitle.textContent = 'Chế độ kiểm tra';
+    return;
+  }
   if (mode === 'lesson' && (!Number.isInteger(unit) || unit < 1 || unit > 18)) { fail('Unit không hợp lệ.'); return; }
   if (mode === 'retry' && !sourceAttemptId) { fail('Không tìm thấy lượt làm bài cần ôn lại.'); return; }
 
@@ -174,7 +197,7 @@
     questions = loader.byIds(incorrectIds);
     if (!questions.length) { fail('Lượt làm bài này không có câu sai để làm lại.'); return; }
   } else {
-    questions = mode === 'exam' ? loader.forExam({ perUnit: 1 }) : loader.forLesson(unit);
+    questions = mode === 'exam' ? loader.forExam({ count: examCount }) : loader.forLesson(unit);
   }
   if (!questions.length) { fail('Chưa có câu hỏi cho bài học này.'); return; }
 
@@ -182,6 +205,7 @@
   const active = storage.getActive();
   const sameContext = active && !active.submittedAt && active.mode === mode &&
     (mode !== 'lesson' || active.unit === unit) &&
+    (mode !== 'exam' || active.questionIds.length === examCount) &&
     (mode !== 'retry' || active.sourceAttemptId === sourceAttemptId);
   if (sameContext) {
     const restoredQuestions = loader.byIds(active.questionIds);
@@ -203,8 +227,8 @@
     retry: 'Ôn lại các câu trả lời sai'
   };
   const descriptions = {
-    exam: '18 câu, mỗi unit một câu. Hoàn thành toàn bộ trước khi nộp bài.',
-    lesson: 'Kiểm tra các khái niệm cốt lõi của unit này trước khi chuyển bài.',
+    exam: examCount + ' câu được lấy ngẫu nhiên từ ngân hàng toàn khóa. Hoàn thành toàn bộ trước khi nộp bài.',
+    lesson: 'Toàn bộ câu hỏi của unit này, bao phủ từ khái niệm đến tình huống ứng dụng.',
     retry: 'Tập trung vào các câu chưa đúng trong lượt làm bài đã chọn.'
   };
   els.modeLabel.textContent = labels[mode]; els.title.textContent = titles[mode]; els.topTitle.textContent = titles[mode];

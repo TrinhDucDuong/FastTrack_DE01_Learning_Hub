@@ -14,6 +14,7 @@ for (const question of bank) {
   assert.strictEqual(ids.has(question.id), false, 'Duplicate question id: ' + question.id);
   ids.add(question.id);
   coverage.set(question.unit, (coverage.get(question.unit) || 0) + 1);
+  assert.strictEqual(new Set(question.choices.map(function (choice) { return choice.text; })).size, question.choices.length, 'Duplicate choice text: ' + question.id);
   const parts = question.lessonUrl.split('#');
   const lessonPath = path.join(__dirname, '..', parts[0]);
   if (!fs.existsSync(lessonPath)) {
@@ -28,7 +29,7 @@ for (const question of bank) {
 assert.deepStrictEqual(brokenReferences, [], brokenReferences.join('\n'));
 
 for (let unit = 1; unit <= 18; unit += 1) {
-  assert.strictEqual(coverage.get(unit), 5, 'Question coverage mismatch for unit ' + unit);
+  assert.strictEqual(coverage.get(unit), 20, 'Question coverage mismatch for unit ' + unit);
   const difficulties = new Set(loader.forLesson(unit).map(function (question) { return question.difficulty; }));
   assert.deepStrictEqual(Array.from(difficulties).sort(), ['applied', 'basic', 'intermediate'], 'Difficulty coverage mismatch for unit ' + unit);
 }

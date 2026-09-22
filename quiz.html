@@ -15,6 +15,41 @@
   </header>
 
   <main class="quiz-shell">
+    <section class="quiz-setup" id="quizSetup" hidden>
+      <p class="eyebrow">Chế độ kiểm tra</p>
+      <h1>Chọn cách kiểm tra kiến thức</h1>
+      <p class="setup-lead">Làm toàn bộ ngân hàng câu hỏi của một bài học hoặc tạo đề toàn khóa với số câu bạn muốn.</p>
+      <div class="setup-grid">
+        <form class="setup-card" action="quiz.html" method="get">
+          <input type="hidden" name="mode" value="lesson">
+          <span class="setup-number">01</span>
+          <h2>Kiểm tra theo bài</h2>
+          <p>Làm đủ 20 câu của unit đã chọn, bao phủ từ khái niệm đến tình huống ứng dụng.</p>
+          <label for="lessonUnit">Chọn bài học</label>
+          <select id="lessonUnit" name="unit" required></select>
+          <button class="button primary" type="submit">Bắt đầu kiểm tra bài →</button>
+        </form>
+        <form class="setup-card" action="quiz.html" method="get">
+          <input type="hidden" name="mode" value="exam">
+          <span class="setup-number">02</span>
+          <h2>Kiểm tra toàn khóa</h2>
+          <p>Câu hỏi được lấy ngẫu nhiên từ toàn bộ 18 unit và xáo trộn lại ở mỗi đề mới.</p>
+          <label for="examCount">Số câu trong đề</label>
+          <select id="examCount" name="count">
+            <option value="20">20 câu</option>
+            <option value="40" selected>40 câu</option>
+            <option value="60">60 câu</option>
+            <option value="90">90 câu</option>
+            <option value="120">120 câu</option>
+            <option value="180">180 câu</option>
+            <option value="360">Toàn bộ 360 câu</option>
+          </select>
+          <button class="button primary" type="submit">Tạo đề ngẫu nhiên →</button>
+        </form>
+      </div>
+      <div class="setup-footer"><a href="progress.html">Xem lịch sử và chủ đề cần ôn →</a></div>
+    </section>
+
     <section class="quiz-intro" id="quizIntro">
       <p class="eyebrow" id="modeLabel">Kiểm tra kiến thức</p>
       <h1 id="quizTitle">Đang tải câu hỏi…</h1>
@@ -67,6 +102,7 @@
     </section>
   </main>
 
+  <script src="assets/question-bank-extra.js"></script>
   <script src="assets/question-bank.js"></script>
   <script src="assets/question-loader.js"></script>
   <script src="assets/quiz-engine.js"></script>

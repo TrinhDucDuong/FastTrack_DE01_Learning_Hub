@@ -7,7 +7,8 @@ Website tự học Data Engineering gồm 18 bài, đi từ Git, Python, SQL và
 - 18 bài học chi tiết với mục lục và điều hướng trước/sau.
 - Tìm kiếm toàn bộ chương trình từ trang chính.
 - Đánh dấu tiến độ học bằng localStorage trên từng trình duyệt.
-- Quiz 5 câu cho từng unit và bài thi tổng hợp 18 unit.
+- Ngân hàng 360 câu hỏi: 20 câu cho từng unit, đủ ba mức độ.
+- Chế độ kiểm tra theo bài dùng toàn bộ câu của unit; kiểm tra toàn khóa cho chọn số lượng và tạo đề ngẫu nhiên.
 - Tự động lưu bài đang làm, khôi phục sau khi tải lại trang và làm lại riêng các câu sai.
 - Lịch sử kết quả, thống kê độ chính xác theo unit và nhận diện chủ đề cần ôn.
 - Dark mode, responsive và hỗ trợ in/lưu PDF.

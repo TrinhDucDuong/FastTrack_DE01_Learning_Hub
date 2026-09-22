@@ -50,11 +50,31 @@
     return copyQuestions(bank.filter(function (question) { return question.unit === Number(unit); }));
   }
 
+  function shuffled(questions, random) {
+    const output = questions.slice();
+    const rng = typeof random === 'function' ? random : Math.random;
+    for (let index = output.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(rng() * (index + 1));
+      const current = output[index]; output[index] = output[swapIndex]; output[swapIndex] = current;
+    }
+    return output;
+  }
+
   function forExam(options) {
-    const perUnit = Math.max(1, Number((options || {}).perUnit) || 1);
-    const selected = [];
+    const config = options || {};
+    const requested = Math.floor(Number(config.count) || 40);
+    const count = Math.max(1, Math.min(requested, bank.length));
+    const buckets = {};
     for (let unit = 1; unit <= 18; unit += 1) {
-      selected.push.apply(selected, bank.filter(function (question) { return question.unit === unit; }).slice(0, perUnit));
+      buckets[unit] = shuffled(bank.filter(function (question) { return question.unit === unit; }), config.random);
+    }
+    const selected = [];
+    while (selected.length < count) {
+      const unitOrder = shuffled(Array.from({ length: 18 }, function (_, index) { return index + 1; }), config.random);
+      for (let index = 0; index < unitOrder.length && selected.length < count; index += 1) {
+        const question = buckets[unitOrder[index]].shift();
+        if (question) selected.push(question);
+      }
     }
     return copyQuestions(selected);
   }
