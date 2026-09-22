@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 16: DataOps &amp; CI/CD for Data Pipelines"><title>DE01 · 16 · DataOps &amp; CI/CD for Data Pipelines</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="16"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 16 · DataOps &amp; CI/CD for Data Pipelines</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 16 / 18</div><h1>DataOps &amp; CI/CD for Data Pipelines</h1><p>Tự động hóa test, promotion, migration và recovery cho code lẫn data.</p><div class="lesson-meta"><span class="pill">DataOps</span><span class="pill">CI/CD</span><span class="pill">Migration</span><span class="pill">Rollback</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-dataops-la-gi">1. DataOps là gì?</h2>
+<p>DataOps áp dụng tư duy engineering và vận hành vào vòng đời dữ liệu: version control, automated test, CI/CD, observability, collaboration và cải tiến liên tục. Mục tiêu là giao dữ liệu nhanh hơn nhưng vẫn đáng tin và truy vết được.</p>
+<pre><code>Plan -&gt; Code -&gt; Review -&gt; Test -&gt; Deploy -&gt; Observe -&gt; Learn</code></pre>
+<h2 id="2-nhung-gi-phai-version-control">2. Những gì phải version control</h2>
+<ul>
+<li>Pipeline/DAG, SQL/dbt, Spark/Python code.</li>
+<li>Schema contract, test, configuration không nhạy cảm.</li>
+<li>Infrastructure as Code.</li>
+<li>Dashboard/semantic model nếu công cụ hỗ trợ.</li>
+<li>Migration và release note.</li>
+</ul>
+<p>Không commit secret, access key, personal data hay output dataset lớn.</p>
+<h2 id="3-ci-pipeline">3. CI pipeline</h2>
+<p>Mỗi pull request nên chạy nhanh từ rẻ đến đắt:</p>
+<ol>
+<li>Format/lint và secret scan.</li>
+<li>Unit test transformation.</li>
+<li>Validate/compile DAG, dbt, IaC.</li>
+<li>Schema/contract test.</li>
+<li>Integration test trên dữ liệu nhỏ và môi trường cô lập.</li>
+<li>Data quality + idempotency test.</li>
+<li>Build artifact/image bất biến.</li>
+</ol>
+<p>CI thất bại phải chặn merge cho control bắt buộc. Test data cần nhỏ, deterministic và không chứa PII production.</p>
+<h2 id="4-cd-va-promotion">4. CD và promotion</h2>
+<p>Build một artifact rồi promote qua môi trường, tránh build lại code khác nhau:</p>
+<pre><code>dev -&gt; test/staging -&gt; production
+          approval      canary/controlled release</code></pre>
+<p>Config/secret thay theo environment; artifact/code giữ nguyên. Production deployment có approval cho thay đổi rủi ro, audit trail và kế hoạch rollback/roll-forward.</p>
+<h2 id="5-database-va-data-migration">5. Database và data migration</h2>
+<p>Schema/data thay đổi khó rollback hơn stateless app vì dữ liệu đã được ghi. Dùng pattern tương thích:</p>
+<ol>
+<li><strong>Expand</strong>: thêm cột/bảng mới, downstream cũ vẫn chạy.</li>
+<li>Backfill và validate.</li>
+<li>Chuyển producer/consumer sang phiên bản mới.</li>
+<li><strong>Contract</strong>: xóa phần cũ sau thời gian deprecation.</li>
+</ol>
+<p>Không rename/drop trực tiếp nếu chưa kiểm tra lineage và consumer. Migration phải idempotent hoặc có trạng thái rõ.</p>
+<h2 id="6-test-pyramid-cho-data">6. Test pyramid cho data</h2>
+<ul>
+<li>Nhiều unit/schema test nhanh.</li>
+<li>Ít integration/end-to-end test nhưng bao phủ critical path.</li>
+<li>Reconciliation test source vs target.</li>
+<li>Regression test KPI bằng golden dataset.</li>
+<li>Performance/cost test cho query/job quan trọng.</li>
+<li>Recovery test: retry, rerun, backfill, restore.</li>
+</ul>
+<p>Data test pass không đủ nếu code không chạy đúng lịch; platform test pass không đủ nếu KPI sai.</p>
+<h2 id="7-deployment-strategy">7. Deployment strategy</h2>
+<ul>
+<li><strong>Rolling</strong>: thay dần compute/workers.</li>
+<li><strong>Blue-green</strong>: hai môi trường, chuyển traffic sau verify.</li>
+<li><strong>Canary</strong>: chạy cho một phần data/workload.</li>
+<li><strong>Shadow/dual run</strong>: pipeline mới chạy song song, so sánh output trước cutover.</li>
+</ul>
+<p>Với transformation quan trọng, dual run + reconciliation thường an toàn: so row count, key, aggregate và sample record giữa legacy/new.</p>
+<h2 id="8-rollback-va-data-recovery">8. Rollback và data recovery</h2>
+<p>Rollback code không tự rollback dữ liệu đã ghi. Cần tách:</p>
+<ul>
+<li>Code rollback/roll-forward.</li>
+<li>Table/version restore hoặc snapshot.</li>
+<li>Recompute partition/window bị ảnh hưởng.</li>
+<li>Invalidate cache/refresh downstream.</li>
+<li>Ghi lại release ID và data range chịu tác động.</li>
+</ul>
+<p>Ưu tiên roll-forward khi migration không thể đảo an toàn. Mọi kế hoạch phải được thử trước production.</p>
+<h2 id="9-branch-va-environment">9. Branch và environment</h2>
+<ul>
+<li>Branch ngắn, pull request nhỏ, review được.</li>
+<li>Developer có schema/database riêng hoặc ephemeral environment.</li>
+<li>Tên resource deterministic theo env/branch và có cleanup TTL.</li>
+<li>Protected production branch/environment.</li>
+<li>Service identity cho automation, không dùng account cá nhân.</li>
+</ul>
+<h2 id="10-bai-thuc-hanh">10. Bài thực hành</h2>
+<p>Thiết kế pipeline CI/CD cho project dbt + Airflow:</p>
+<ul>
+<li>PR: lint, parse DAG, <code>dbt build</code> trong schema tạm, unit/data test.</li>
+<li>Merge: tạo artifact/version và deploy staging.</li>
+<li>Staging: chạy sample/backfill nhỏ, reconciliation.</li>
+<li>Approval: deploy production.</li>
+<li>Post-deploy: smoke test, freshness/quality monitor.</li>
+<li>Rollback: chỉ rõ code và data recovery khác nhau thế nào.</li>
+</ul>
+<h2 id="11-checklist">11. Checklist</h2>
+<ul>
+<li><span class="check"></span>Build artifact một lần và promote.</li>
+<li><span class="check"></span>Môi trường/credential tách biệt.</li>
+<li><span class="check"></span>Test gồm code, contract, data và rerun.</li>
+<li><span class="check"></span>Migration backward-compatible và có lineage impact analysis.</li>
+<li><span class="check"></span>Có audit, approval, post-deploy verify và data-aware rollback.</li>
+</ul>
+<h2 id="12-ci-pipeline-mau-theo-stage">12. CI pipeline mẫu theo stage</h2>
+<pre><code>validate
+  -&gt; format/lint + secret scan + dependency scan
+unit
+  -&gt; Python/SQL macro tests
+compile
+  -&gt; dbt compile + Airflow parse + IaC validate
+integration
+  -&gt; ephemeral schema/resources + sample data
+quality
+  -&gt; contracts + data tests + reconciliation + rerun test
+package
+  -&gt; immutable image/artifact + manifest/SBOM</code></pre>
+<p>Stage rẻ/chạy nhanh đặt trước để feedback sớm. Cache dependency có kiểm soát; không cache output có thể làm test stale.</p>
+<h2 id="13-environment-isolation">13. Environment isolation</h2>
+<p>Mỗi PR có schema như <code>ci_pr_123</code>, service identity giới hạn và cleanup TTL. Test không đọc/ghi production. Nếu dùng production metadata/artifact để defer, credential vẫn chỉ read cần thiết.</p>
+<p>Config matrix cần ghi rõ cái gì thay đổi theo env:</p>
+<table><thead><tr><th>Thành phần</th><th>Dev</th><th>Staging</th><th>Prod</th></tr></thead><tbody><tr><td>Data</td><td>synthetic/masked</td><td>representative</td><td>real</td></tr><tr><td>Scale</td><td>nhỏ</td><td>gần prod cho test chính</td><td>theo SLA</td></tr><tr><td>Identity</td><td>dev service principal</td><td>staging identity</td><td>prod managed identity</td></tr><tr><td>Approval</td><td>nhẹ</td><td>integration gate</td><td>protected environment</td></tr></tbody></table>
+<h2 id="14-schema-migration-expand-contract">14. Schema migration expand-contract</h2>
+<p>Ví dụ đổi <code>customer_name</code> thành <code>full_name</code>:</p>
+<ol>
+<li>Expand: thêm <code>full_name</code>, producer ghi cả hai hoặc view compatibility.</li>
+<li>Backfill <code>full_name</code>; test null/count/equality.</li>
+<li>Migrate consumers; theo dõi usage cột cũ.</li>
+<li>Announce deprecation deadline.</li>
+<li>Contract: xóa cột cũ trong release riêng sau khi zero consumer.</li>
+</ol>
+<p>Đây là thay đổi nhiều release, không phải một <code>ALTER TABLE RENAME</code> tức thời.</p>
+<h2 id="15-golden-dataset-va-regression">15. Golden dataset và regression</h2>
+<p>Golden dataset nhỏ nhưng chứa edge case: duplicate, null, late event, refund, timezone boundary, SCD change. Expected output được review. Khi logic đổi có chủ đích, cập nhật expected cùng lý do nghiệp vụ; không chấp nhận snapshot mới chỉ để test xanh.</p>
+<h2 id="16-deployment-verification">16. Deployment verification</h2>
+<p>Sau deploy:</p>
+<ul>
+<li>Smoke run một interval nhỏ.</li>
+<li>Xác nhận code/artifact version trong log.</li>
+<li>Chạy schema + critical data tests.</li>
+<li>So metrics với baseline: rows, duration, cost, errors.</li>
+<li>Quan sát ít nhất một schedule nếu rủi ro cao.</li>
+<li>Có decision rollback/continue rõ.</li>
+</ul>
+<h2 id="17-supply-chain-va-dependency">17. Supply chain và dependency</h2>
+<p>Pin/lock dependency, scan vulnerability/license theo policy, build từ trusted runner và ký/ghi checksum artifact khi phù hợp. Không cài package tùy ý trực tiếp trên worker production.</p>
+<h2 id="18-cau-hoi-co-ap-an">18. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>CI pass có đảm bảo production data đúng?</strong> Không; cần post-deploy data validation/monitoring.</li>
+<li><strong>Vì sao build once promote many?</strong> Giảm khác biệt artifact giữa môi trường và tăng traceability.</li>
+<li><strong>Rollback luôn tốt hơn roll-forward?</strong> Không; data migration đã ghi có thể không đảo an toàn.</li>
+<li><strong>E2E test càng nhiều càng tốt?</strong> Không; chậm/flaky. Dùng test pyramid và một số critical paths.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-15.html"><small>← Bài trước</small><b>Data Governance &amp; Security</b></a><a class="next" href="unit-17.html"><small>Bài tiếp →</small><b>Capstone: End-to-End Analytics Pipeline</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 16 / 18</footer><script src="../assets/lesson.js"></script></body></html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 13: Monitoring &amp; Operations on Azure"><title>DE01 · 13 · Monitoring &amp; Operations on Azure</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="13"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 13 · Monitoring &amp; Operations on Azure</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 13 / 18</div><h1>Monitoring &amp; Operations on Azure</h1><p>Quan sát system health, data correctness và xử lý incident có quy trình.</p><div class="lesson-meta"><span class="pill">Monitoring</span><span class="pill">SLO</span><span class="pill">Alerts</span><span class="pill">Runbook</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-muc-tieu-cua-observability">1. Mục tiêu của observability</h2>
+<p>Monitoring trả lời &quot;hệ thống có ổn không?&quot;; observability giúp điều tra &quot;vì sao không ổn?&quot; từ tín hiệu hệ thống phát ra.</p>
+<p>Ba tín hiệu chính:</p>
+<ul>
+<li><strong>Logs</strong>: sự kiện chi tiết có timestamp/context.</li>
+<li><strong>Metrics</strong>: chuỗi số theo thời gian, tốt cho dashboard/alert.</li>
+<li><strong>Traces/lineage</strong>: một request/run/data đi qua các bước nào.</li>
+</ul>
+<p>Data pipeline còn cần data observability: freshness, volume, schema, quality và lineage.</p>
+<h2 id="2-azure-monitoring-stack-co-ban">2. Azure monitoring stack cơ bản</h2>
+<ul>
+<li><strong>Azure Monitor</strong>: nền tảng giám sát chung.</li>
+<li><strong>Metrics</strong>: số liệu time-series của resource.</li>
+<li><strong>Log Analytics workspace</strong>: nơi truy vấn log bằng KQL.</li>
+<li><strong>Application Insights</strong>: telemetry ứng dụng/API khi phù hợp.</li>
+<li><strong>Alerts + Action Groups</strong>: điều kiện cảnh báo và nơi nhận thông báo/action.</li>
+<li><strong>Diagnostic settings</strong>: route resource logs/metrics đến destination.</li>
+</ul>
+<p>Không phải dịch vụ nào cũng phát cùng loại log. Khi tạo resource mới, kiểm tra diagnostic settings và retention thay vì đợi có incident.</p>
+<h2 id="3-golden-signals-cho-pipeline">3. Golden signals cho pipeline</h2>
+<table><thead><tr><th>Nhóm</th><th>Ví dụ</th></tr></thead><tbody><tr><td>Availability</td><td>Run success rate, missed schedule, heartbeat</td></tr><tr><td>Latency</td><td>End-to-end duration, step duration, freshness lag</td></tr><tr><td>Throughput</td><td>Rows/bytes/events mỗi phút</td></tr><tr><td>Errors</td><td>Failed run, rejected rows, parse errors, retries</td></tr><tr><td>Saturation</td><td>CPU/memory, queue depth, consumer lag, IR/cluster capacity</td></tr><tr><td>Correctness</td><td>Row count, duplicate, null, control total, schema drift</td></tr><tr><td>Cost</td><td>Compute time, bytes scanned, log/storage growth</td></tr></tbody></table>
+<p>Chỉ alert <code>status=failed</code> là chưa đủ: pipeline có thể xanh nhưng nhận zero record, thiếu partition hoặc KPI sai.</p>
+<h2 id="4-structured-logging">4. Structured logging</h2>
+<p>Mỗi log quan trọng nên có:</p>
+<pre><code>timestamp, severity, service, environment,
+pipeline_name, step_name, run_id, batch_id,
+dataset, source_system, status, error_code,
+rows_in, rows_out, duration_ms</code></pre>
+<p><code>run_id</code>/correlation ID phải được truyền xuyên ingest → transform → serve để trace. Không log secret, token, raw PII hoặc toàn bộ payload nhạy cảm.</p>
+<h2 id="5-alert-tot">5. Alert tốt</h2>
+<p>Một alert có ích phải <strong>actionable</strong>:</p>
+<ul>
+<li>Nêu cái gì hỏng, ở môi trường nào.</li>
+<li>Có mức severity theo tác động business.</li>
+<li>Link dashboard/log query/runbook.</li>
+<li>Gắn owner/escalation path.</li>
+<li>Deduplicate/suppress để tránh alert storm.</li>
+<li>Có ngưỡng và cửa sổ hợp lý; cân nhắc anomaly/baseline cho volume.</li>
+</ul>
+<p>SLO ví dụ: &quot;99% pipeline daily hoàn tất trước 07:00 trong 30 ngày&quot;. SLA là cam kết với bên sử dụng; SLI là số đo thực tế dùng để tính SLO.</p>
+<h2 id="6-kql-nhap-mon">6. KQL nhập môn</h2>
+<pre><code>PipelineRuns
+| where TimeGenerated &gt; ago(24h)
+| where Environment == &quot;prod&quot;
+| summarize Runs=count(), Failures=countif(Status == &quot;Failed&quot;) by PipelineName
+| order by Failures desc</code></pre>
+<p>Tên table/field phụ thuộc nguồn log thực tế. Luôn giới hạn time range trước, rồi filter/project/summarize để truy vấn dễ đọc và ít tốn hơn.</p>
+<h2 id="7-incident-response">7. Incident response</h2>
+<pre><code>Detect -&gt; Triage -&gt; Contain -&gt; Recover -&gt; Verify -&gt; Learn</code></pre>
+<p>Khi nhận alert:</p>
+<ol>
+<li>Xác định <code>run_id</code>, step và thời điểm fail.</li>
+<li>Xác định dataset/date range/report bị ảnh hưởng.</li>
+<li>Phân loại source, network, compute, code hay data quality.</li>
+<li>Chọn retry/rerun/backfill/rollback theo runbook.</li>
+<li>Xác minh row count, control total và freshness sau phục hồi.</li>
+<li>Viết post-incident: timeline, root cause, contributing factors, action item + owner/date.</li>
+</ol>
+<p>Không rerun production nếu chưa biết rerun có idempotent hay không.</p>
+<h2 id="8-tinh-huong-troubleshooting">8. Tình huống troubleshooting</h2>
+<table><thead><tr><th>Signal</th><th>Kiểm tra đầu tiên</th></tr></thead><tbody><tr><td>Event Hub lag tăng</td><td>Ingress rate, partition skew, consumer compute, sink latency</td></tr><tr><td>ADF không có run</td><td>Trigger, disabled pipeline, dependency, schedule/timezone</td></tr><tr><td>Spark duration gấp đôi</td><td>Input growth, skew, shuffle, executor/cluster</td></tr><tr><td>Dashboard cũ</td><td>Pipeline freshness, warehouse load, semantic refresh/cache</td></tr><tr><td>KPI đổi bất ngờ</td><td>Source → Bronze → Silver → Gold → semantic/visual</td></tr></tbody></table>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Lập dashboard vận hành cho pipeline orders:</p>
+<ul>
+<li>Success/failure và duration theo step.</li>
+<li>Last successful data timestamp.</li>
+<li>Rows source/Bronze/Silver/Gold.</li>
+<li>Bad-row rate và duplicate rate.</li>
+<li>Cost hoặc compute time.</li>
+<li>Ba alert: missed SLA, zero volume, failure spike.</li>
+<li>Runbook một trang cho từng alert.</li>
+</ul>
+<h2 id="10-checklist">10. Checklist</h2>
+<ul>
+<li><span class="check"></span>Log/metric có environment và correlation ID.</li>
+<li><span class="check"></span>Theo dõi cả system health lẫn data correctness.</li>
+<li><span class="check"></span>Alert có owner, severity, runbook và không chứa secret.</li>
+<li><span class="check"></span>Retention log phù hợp điều tra và chi phí.</li>
+<li><span class="check"></span>Sau recovery có bước verify data và thông báo stakeholder.</li>
+</ul>
+<p>Tài liệu học tiếp: <a href="https://learn.microsoft.com/azure/azure-monitor/" target="_blank" rel="noreferrer">Azure Monitor documentation</a>.</p>
+<h2 id="11-sli-slo-va-error-budget">11. SLI, SLO và error budget</h2>
+<p>Ví dụ SLI cho pipeline daily: tỷ lệ run hoàn tất trước 07:00 và vượt qua quality gate. SLO: 99% trong cửa sổ 30 ngày. Nếu có 100 run/tháng, error budget khoảng 1 run không đạt.</p>
+<p>SLO phải phản ánh trải nghiệm consumer, không chỉ task status. Dashboard 07:00 cần dữ liệu mới thì &quot;pipeline chạy xong 08:00&quot; là vi phạm dù không error.</p>
+<h2 id="12-metric-cardinality">12. Metric cardinality</h2>
+<p>Label như <code>environment</code>, <code>pipeline</code>, <code>status</code> hữu ích. Không dùng <code>user_id</code>, raw error message hay <code>run_id</code> làm metric label vì cardinality bùng nổ; các giá trị chi tiết thuộc log/trace. Metric dùng phát hiện xu hướng, log dùng điều tra instance cụ thể.</p>
+<h2 id="13-kql-thuc-hanh">13. KQL thực hành</h2>
+<p>Tìm pipeline chậm theo percentile:</p>
+<pre><code>PipelineRuns
+| where TimeGenerated &gt; ago(7d)
+| where Status == &quot;Succeeded&quot;
+| summarize p50=percentile(DurationMs, 50),
+            p95=percentile(DurationMs, 95),
+            Runs=count()
+  by PipelineName
+| order by p95 desc</code></pre>
+<p>Theo dõi volume so baseline:</p>
+<pre><code>DataQualityMetrics
+| where TimeGenerated &gt; ago(14d) and MetricName == &quot;rows_out&quot;
+| summarize DailyRows=sum(MetricValue) by bin(TimeGenerated, 1d), Dataset
+| order by Dataset, TimeGenerated</code></pre>
+<p>Schema bảng thực tế phụ thuộc diagnostic configuration; mục tiêu là tư duy filter time → scope → summarize → compare.</p>
+<h2 id="14-alert-design-example">14. Alert design example</h2>
+<p>Alert <code>Gold sales freshness &gt; 90 minutes</code>:</p>
+<ul>
+<li>Severity: high trong business hours.</li>
+<li>Evaluation: mỗi 5 phút, require 3 lần liên tiếp để tránh noise.</li>
+<li>Context: dataset, last successful timestamp, upstream run ID.</li>
+<li>Link: dashboard + query + runbook.</li>
+<li>Owner: data platform primary/on-call; notify BI owner nếu vượt SLA.</li>
+<li>Recovery signal: freshness trở lại và reconciliation pass.</li>
+</ul>
+<h2 id="15-incident-walkthrough-dashboard-sai-doanh-thu">15. Incident walkthrough: dashboard sai doanh thu</h2>
+<ol>
+<li>Ghi nhận thời điểm, filter và expected/actual value.</li>
+<li>Freeze/label dashboard nếu quyết định business có rủi ro.</li>
+<li>So semantic model với Gold cùng scope.</li>
+<li>So Gold với Silver control total; kiểm tra grain/late data.</li>
+<li>So Silver với Bronze/source; kiểm tra watermark/join reject.</li>
+<li>Tìm commit/config/run gần nhất.</li>
+<li>Fix + backfill affected range + refresh report.</li>
+<li>Verify bằng independent query và stakeholder sign-off.</li>
+</ol>
+<p>Không sửa DAX để &quot;khớp số&quot; nếu chưa tìm root cause.</p>
+<h2 id="16-post-incident-khong-o-loi">16. Post-incident không đổ lỗi</h2>
+<p>Phân biệt triggering event, root cause và contributing factors. Action item phải cụ thể, có owner/date và ưu tiên control hệ thống hơn lời nhắc &quot;cẩn thận hơn&quot;. Ví dụ thêm relationship test/reconciliation gate thay vì chỉ yêu cầu reviewer nhớ kiểm tra join.</p>
+<h2 id="17-cau-hoi-co-ap-an">17. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Average latency có đủ không?</strong> Không; percentile p95/p99 cho thấy tail latency.</li>
+<li><strong>Log càng nhiều càng tốt?</strong> Không; noise, cost và nguy cơ lộ dữ liệu tăng.</li>
+<li><strong>Alert zero rows luôn severity cao?</strong> Tùy business calendar/expected volume; cần context.</li>
+<li><strong>Runbook khác postmortem?</strong> Runbook hướng dẫn xử lý; postmortem học từ incident và tạo cải tiến.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-12.html"><small>← Bài trước</small><b>Real-time Data Streaming on Azure</b></a><a class="next" href="unit-14.html"><small>Bài tiếp →</small><b>Advanced Orchestration with Airflow</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 13 / 18</footer><script src="../assets/lesson.js"></script></body></html>

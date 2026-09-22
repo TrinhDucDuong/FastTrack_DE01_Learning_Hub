@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 3: Relational Databases &amp; Advanced SQL"><title>DE01 · 03 · Relational Databases &amp; Advanced SQL</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="3"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 03 · Relational Databases &amp; Advanced SQL</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 03 / 18</div><h1>Relational Databases &amp; Advanced SQL</h1><p>Hiểu transaction, index, execution plan và cách viết SQL phân tích.</p><div class="lesson-meta"><span class="pill">SQL</span><span class="pill">ACID</span><span class="pill">Index</span><span class="pill">Window Function</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-muc-tieu">1. Mục tiêu</h2>
+<p>Sau bài này, bạn cần thiết kế bảng OLTP cơ bản, giải thích ACID/index/query plan, viết join/aggregate/window function đúng grain và nhận diện race condition.</p>
+<h2 id="2-relational-model-va-constraint">2. Relational model và constraint</h2>
+<ul>
+<li>Table đại diện một loại entity hoặc relationship.</li>
+<li>Primary key định danh duy nhất một row.</li>
+<li>Foreign key bảo vệ quan hệ giữa bảng.</li>
+<li><code>NOT NULL</code>, <code>UNIQUE</code>, <code>CHECK</code> đưa invariant quan trọng xuống database.</li>
+<li>Constraint không thay validation ở API; hai lớp bảo vệ các boundary khác nhau.</li>
+</ul>
+<p>Ví dụ:</p>
+<pre><code>CREATE TABLE orders (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    status VARCHAR(20) NOT NULL
+        CHECK (status IN ('Pending', 'Paid', 'Cancelled')),
+    total_amount DECIMAL(18, 2) NOT NULL CHECK (total_amount &gt;= 0),
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);</code></pre>
+<h2 id="3-normalization-thay-vi-chi-nho-1nf-2nf-3nf">3. Normalization thay vì chỉ nhớ 1NF/2NF/3NF</h2>
+<p>Mục tiêu normalization là giảm update anomaly và giữ một fact nghiệp vụ ở một nơi.</p>
+<ul>
+<li><strong>1NF</strong>: mỗi cell có giá trị nguyên tử theo model; không lưu danh sách product ID bằng chuỗi <code>1,2,3</code>.</li>
+<li><strong>2NF</strong>: với composite key, non-key column phụ thuộc toàn bộ key. Trong <code>order_items(order_id, product_id, product_name)</code>, <code>product_name</code> chỉ phụ thuộc <code>product_id</code>, nên thuộc bảng products.</li>
+<li><strong>3NF</strong>: non-key column không phụ thuộc bắc cầu qua non-key khác. <code>orders(user_id, user_city)</code> dễ stale vì city phụ thuộc user.</li>
+</ul>
+<p>Denormalization là quyết định có chủ đích để tối ưu đọc, kèm cơ chế giữ dữ liệu đồng bộ; không phải &quot;bỏ normalization cho nhanh&quot;.</p>
+<h2 id="4-acid-bang-tinh-huong-thanh-toan">4. ACID bằng tình huống thanh toán</h2>
+<ul>
+<li><strong>Atomicity</strong>: tạo payment và đổi order status cùng thành công hoặc rollback.</li>
+<li><strong>Consistency</strong>: constraint/invariant đúng trước và sau transaction.</li>
+<li><strong>Isolation</strong>: hai checkout đồng thời không bán cùng đơn/tồn kho sai.</li>
+<li><strong>Durability</strong>: đã commit thì vẫn tồn tại sau restart theo guarantee của hệ thống.</li>
+</ul>
+<p>Isolation level kiểm soát hiện tượng đọc đồng thời như dirty read, non-repeatable read và phantom. Isolation mạnh hơn thường đánh đổi concurrency; chọn theo invariant và DB engine.</p>
+<h2 id="5-index-hoat-ong-va-vi-sao-khong-tao-that-nhieu">5. Index hoạt động và vì sao không tạo thật nhiều</h2>
+<p>B-tree giữ key có thứ tự và pointer tới row/page. Index hữu ích cho equality, range, join và order theo prefix phù hợp.</p>
+<p>Composite index <code>(status, created_at)</code> hỗ trợ:</p>
+<pre><code>WHERE status = 'Paid' AND created_at &gt;= :start</code></pre>
+<p>nhưng thường không tối ưu chỉ <code>WHERE created_at &gt;= :start</code> vì left-most prefix. Index tốn storage, tăng write cost và maintenance. Cột boolean ít selective hiếm khi đáng index đơn lẻ.</p>
+<p>Covering index chứa đủ cột query cần, giảm lookup về bảng nhưng làm index lớn. Luôn xác nhận bằng execution plan và workload thực.</p>
+<h2 id="6-logical-query-processing-order">6. Logical query processing order</h2>
+<pre><code>FROM/JOIN -&gt; ON -&gt; WHERE -&gt; GROUP BY -&gt; HAVING
+-&gt; SELECT -&gt; DISTINCT -&gt; ORDER BY -&gt; LIMIT</code></pre>
+<p>Điều này giải thích vì sao alias tạo ở <code>SELECT</code> thường chưa dùng được trong <code>WHERE</code>, và vì sao filter trước aggregate đặt ở <code>WHERE</code>, filter sau aggregate đặt ở <code>HAVING</code>.</p>
+<h2 id="7-join-va-loi-nhan-ban-measure">7. JOIN và lỗi nhân bản measure</h2>
+<pre><code>SELECT o.id, SUM(oi.quantity * oi.unit_price) AS revenue
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+WHERE o.status = 'Paid'
+GROUP BY o.id;</code></pre>
+<p>Trước join phải biết cardinality: 1:1, 1:N hay N:N. Nếu join thêm <code>payments</code> (một order có nhiều payment attempt), mỗi item có thể bị lặp. Giải pháp thường là aggregate payment về một row/order trước khi join hoặc join đúng record thành công.</p>
+<h2 id="8-window-function">8. Window function</h2>
+<p>Window function không làm mất row như <code>GROUP BY</code>:</p>
+<pre><code>SELECT
+    user_id,
+    id AS order_id,
+    created_at,
+    LAG(created_at) OVER (
+        PARTITION BY user_id ORDER BY created_at
+    ) AS previous_order_at,
+    ROW_NUMBER() OVER (
+        PARTITION BY user_id ORDER BY created_at DESC
+    ) AS recency_rank
+FROM orders
+WHERE status = 'Paid';</code></pre>
+<p><code>ROW_NUMBER</code> luôn đánh số duy nhất; <code>RANK</code> để hở hạng khi tie; <code>DENSE_RANK</code> không để hở.</p>
+<h2 id="9-cte-subquery-va-query-rewrite">9. CTE, subquery và query rewrite</h2>
+<p>CTE chủ yếu giúp biểu đạt logic; có materialize hay inline phụ thuộc engine/version. Query rewrite thực tế:</p>
+<ul>
+<li>Chỉ select cột cần, tránh <code>SELECT *</code>.</li>
+<li>Filter sớm khi không đổi semantics.</li>
+<li>Tránh function/cast trên indexed column trong predicate nếu có thể.</li>
+<li>Thay correlated subquery chạy lặp bằng join/window khi hợp lý.</li>
+<li>Aggregate về đúng grain trước khi join.</li>
+<li>Dùng <code>EXPLAIN</code>/actual plan thay vì đoán optimizer.</li>
+</ul>
+<p>Ví dụ predicate dễ dùng index hơn:</p>
+<pre><code>-- Tránh: WHERE DATE(created_at) = '2026-09-22'
+WHERE created_at &gt;= '2026-09-22'
+  AND created_at &lt;  '2026-09-23'</code></pre>
+<h2 id="10-concurrency-control">10. Concurrency control</h2>
+<ul>
+<li><strong>Pessimistic lock</strong>: khóa trước khi sửa; rõ ràng nhưng có wait/deadlock.</li>
+<li><strong>Optimistic lock</strong>: update kèm version; nếu zero row affected thì có conflict.</li>
+</ul>
+<pre><code>UPDATE products
+SET stock = stock - :qty,
+    version = version + 1
+WHERE id = :id
+  AND version = :expected_version
+  AND stock &gt;= :qty;</code></pre>
+<p>Nếu affected rows = 0, dữ liệu đã đổi hoặc tồn kho thiếu; application phải xử lý, không coi là success.</p>
+<h2 id="11-oc-execution-plan">11. Đọc execution plan</h2>
+<p>Tìm scan/seek, estimated vs actual rows, join algorithm, sort/hash spill và predicate. Ước lượng sai lớn có thể đến từ statistics cũ hoặc data skew. Đừng kết luận &quot;scan luôn xấu&quot;: đọc phần lớn bảng thì sequential scan có thể rẻ hơn nhiều random lookup.</p>
+<h2 id="12-mini-lab">12. Mini lab</h2>
+<ol>
+<li>Tạo <code>users</code>, <code>orders</code>, <code>order_items</code>, <code>products</code> có constraint.</li>
+<li>Query top 2 product/category bằng <code>DENSE_RANK</code>.</li>
+<li>Tính thời gian giữa hai lần mua bằng <code>LAG</code>.</li>
+<li>Tạo index phục vụ orders paid theo khoảng ngày và xem plan trước/sau.</li>
+<li>Cố ý join thêm payment attempts, phát hiện double count rồi sửa.</li>
+</ol>
+<h2 id="13-cau-hoi-co-ap-an">13. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Index làm query đọc nhanh nhưng đổi lại gì?</strong> Storage, write/maintenance cost và optimizer complexity.</li>
+<li><strong>WHERE khác HAVING?</strong> WHERE lọc row trước grouping; HAVING lọc group sau aggregate.</li>
+<li><strong>Vì sao <code>DISTINCT</code> không phải cách sửa join tốt?</strong> Nó che sai cardinality và có thể xóa row hợp lệ, đồng thời tốn sort/hash.</li>
+<li><strong>Khi nào optimistic locking hợp lý?</strong> Conflict hiếm và không muốn giữ lock lâu.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-02.html"><small>← Bài trước</small><b>Python for Application Development</b></a><a class="next" href="unit-04.html"><small>Bài tiếp →</small><b>API Development with FastAPI</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 03 / 18</footer><script src="../assets/lesson.js"></script></body></html>

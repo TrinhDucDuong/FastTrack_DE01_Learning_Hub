@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 15: Data Governance &amp; Security"><title>DE01 · 15 · Data Governance &amp; Security</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="15"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 15 · Data Governance &amp; Security</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 15 / 18</div><h1>Data Governance &amp; Security</h1><p>Dữ liệu có owner, ý nghĩa, lineage, quyền và vòng đời rõ ràng.</p><div class="lesson-meta"><span class="pill">Governance</span><span class="pill">Lineage</span><span class="pill">PII</span><span class="pill">Least Privilege</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-governance-khong-chi-la-khoa-du-lieu">1. Governance không chỉ là khóa dữ liệu</h2>
+<p>Data governance xác định ai sở hữu dữ liệu, dữ liệu có nghĩa gì, đến từ đâu, ai được dùng, chất lượng và retention ra sao. Security là một phần của governance.</p>
+<p>Các vai trò thường gặp:</p>
+<ul>
+<li><strong>Data owner</strong>: chịu trách nhiệm business, duyệt định nghĩa/quyền.</li>
+<li><strong>Data steward</strong>: duy trì metadata, chất lượng, classification.</li>
+<li><strong>Data custodian/platform team</strong>: vận hành kỹ thuật và control.</li>
+<li><strong>Data consumer</strong>: dùng dữ liệu theo mục đích được phép.</li>
+</ul>
+<h2 id="2-data-catalog-va-lineage">2. Data catalog và lineage</h2>
+<p>Một dataset đáng tin nên có:</p>
+<ul>
+<li>Business/technical name và description.</li>
+<li>Grain, schema, owner/steward.</li>
+<li>Source và lineage qua các transformation.</li>
+<li>Freshness/SLA và quality tests.</li>
+<li>Classification/sensitivity.</li>
+<li>Retention và certified/deprecated status.</li>
+</ul>
+<p>Catalog giúp tìm và hiểu dữ liệu; không tự đảm bảo dữ liệu đúng nếu thiếu owner/test/process.</p>
+<h2 id="3-phan-loai-du-lieu">3. Phân loại dữ liệu</h2>
+<p>Ví dụ mức độ:</p>
+<pre><code>Public -&gt; Internal -&gt; Confidential -&gt; Restricted</code></pre>
+<p>PII gồm dữ liệu nhận diện trực tiếp hoặc có thể kết hợp để nhận diện. Mỗi lớp cần control về quyền, encryption, masking, logging, sharing và retention. Không copy production PII sang dev nếu chưa có masking/tokenization và phê duyệt.</p>
+<h2 id="4-authentication-va-authorization">4. Authentication và authorization</h2>
+<ul>
+<li>Xác thực bằng Entra ID; workload dùng managed identity/service principal phù hợp.</li>
+<li>RBAC cho Azure resource/data action; ACL cho path ADLS khi cần.</li>
+<li>Database/warehouse role tách reader, writer, admin.</li>
+<li>Row-level security và column masking phục vụ phạm vi truy cập chi tiết.</li>
+<li>Định kỳ access review; thu hồi quyền người rời team.</li>
+</ul>
+<p>Tránh cấp Owner/Contributor rộng để &quot;chạy cho nhanh&quot;. Tách người deploy, người duyệt và tài khoản break-glass.</p>
+<h2 id="5-secret-key-va-encryption">5. Secret, key và encryption</h2>
+<ul>
+<li>Secret ở Key Vault/secret backend, không ở source code, notebook hoặc log.</li>
+<li>Rotate secret/key và theo dõi expiry.</li>
+<li>TLS cho data in transit; encryption at rest theo dịch vụ.</li>
+<li>Customer-managed key khi policy/compliance yêu cầu, kèm kế hoạch key recovery.</li>
+<li>Managed identity giúp giảm secret dài hạn nhưng vẫn phải kiểm soát role.</li>
+</ul>
+<h2 id="6-data-quality-va-data-contract">6. Data quality và data contract</h2>
+<p>Data contract ghi rõ schema, semantic, owner, SLA, compatibility và cách thông báo thay đổi. Producer không tùy ý đổi tên/type cột làm downstream vỡ.</p>
+<p>Quality dimensions:</p>
+<ul>
+<li>Completeness, uniqueness, validity.</li>
+<li>Consistency và accuracy.</li>
+<li>Timeliness/freshness.</li>
+</ul>
+<p>Record lỗi có thể quarantine; không âm thầm bỏ. Quality incident phải trace được phạm vi dữ liệu/report bị ảnh hưởng.</p>
+<h2 id="7-retention-deletion-va-audit">7. Retention, deletion và audit</h2>
+<ul>
+<li>Giữ dữ liệu đúng thời hạn nghiệp vụ/pháp lý, không &quot;giữ mãi phòng khi cần&quot;.</li>
+<li>Lifecycle/delete phải bao gồm raw, derived data, backup, cache và export nếu policy yêu cầu.</li>
+<li>Audit ai truy cập/thay đổi quyền, schema và pipeline.</li>
+<li>Log audit cũng cần chống sửa và retention phù hợp.</li>
+<li>Backup/redundancy không thay nghĩa vụ xóa và không thay access control.</li>
+</ul>
+<h2 id="8-threat-modeling-nhanh-cho-pipeline">8. Threat modeling nhanh cho pipeline</h2>
+<pre><code>Source -&gt; Ingest -&gt; Lake -&gt; Transform -&gt; Warehouse -&gt; BI</code></pre>
+<p>Ở mỗi mũi tên hỏi:</p>
+<ul>
+<li>Danh tính nào truy cập? Có quá quyền không?</li>
+<li>Dữ liệu có đi qua public network không?</li>
+<li>Có mã hóa và xác minh integrity không?</li>
+<li>Log có lộ secret/PII không?</li>
+<li>Schema/file độc hại có thể đi vào không?</li>
+<li>Có audit, alert và revoke path không?</li>
+</ul>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Lập governance sheet cho <code>customers</code>, <code>orders</code>, <code>payments</code>:</p>
+<ul>
+<li>Owner/steward và grain.</li>
+<li>Classification từng cột.</li>
+<li>Ai được đọc raw, Silver, Gold.</li>
+<li>Mask/tokenize trường nào ở dev/BI.</li>
+<li>Quality tests và freshness SLA.</li>
+<li>Retention/deletion policy.</li>
+<li>Lineage tới dashboard doanh thu.</li>
+</ul>
+<h2 id="10-checklist">10. Checklist</h2>
+<ul>
+<li><span class="check"></span>Mỗi dataset quan trọng có owner, mô tả và classification.</li>
+<li><span class="check"></span>Least privilege, access review và audit được áp dụng.</li>
+<li><span class="check"></span>Secret không nằm trong code/log.</li>
+<li><span class="check"></span>Có contract, lineage, quality và change process.</li>
+<li><span class="check"></span>Retention/deletion/recovery được kiểm thử, không chỉ viết trên giấy.</li>
+</ul>
+<p>Tài liệu học tiếp: <a href="https://learn.microsoft.com/purview/" target="_blank" rel="noreferrer">Microsoft Purview documentation</a>, <a href="https://learn.microsoft.com/azure/security/fundamentals/" target="_blank" rel="noreferrer">Azure security fundamentals</a>.</p>
+<h2 id="11-metadata-ba-lop">11. Metadata ba lớp</h2>
+<ul>
+<li><strong>Technical metadata</strong>: schema, type, partition, location, lineage, job.</li>
+<li><strong>Business metadata</strong>: định nghĩa, KPI, owner, domain, certified status.</li>
+<li><strong>Operational metadata</strong>: run, freshness, quality score, volume, incident.</li>
+</ul>
+<p>Catalog hữu ích khi nối đủ ba lớp. Schema không cho biết <code>net_revenue</code> đã trừ refund chưa; business glossary phải nói rõ.</p>
+<h2 id="12-lineage-column-level-bang-vi-du">12. Lineage column-level bằng ví dụ</h2>
+<pre><code>orders.total_amount ----\
+                         -&gt; fct_sales.net_amount -&gt; KPI Net Revenue
+refunds.refund_amount --/</code></pre>
+<p>Khi cột nguồn đổi type hoặc KPI thay công thức, lineage giúp tìm dashboard/model bị ảnh hưởng. Lineage tự động cần được bổ sung bằng owner và semantics; graph đẹp nhưng thiếu nghĩa vẫn chưa tạo trust.</p>
+<h2 id="13-access-request-lifecycle">13. Access request lifecycle</h2>
+<ol>
+<li>Người dùng nêu dataset, mục đích và thời hạn.</li>
+<li>Owner/steward duyệt theo classification/policy.</li>
+<li>Cấp role/group thay vì permission cá nhân rải rác.</li>
+<li>Log/audit usage phù hợp.</li>
+<li>Review định kỳ và thu hồi khi đổi role/hết hạn.</li>
+</ol>
+<p>Privileged access nên time-bound/JIT khi có thể. Break-glass account cần kiểm soát, alert và review sau sử dụng.</p>
+<h2 id="14-masking-tokenization-va-anonymization">14. Masking, tokenization và anonymization</h2>
+<ul>
+<li>Masking che một phần khi hiển thị, dữ liệu gốc vẫn tồn tại.</li>
+<li>Tokenization thay identifier bằng token có mapping bảo vệ.</li>
+<li>Hash deterministic hỗ trợ join nhưng dễ dictionary attack với domain nhỏ; cần salt/keyed approach theo threat model.</li>
+<li>Anonymization thật sự khó vì dữ liệu có thể re-identify khi kết hợp.</li>
+</ul>
+<p>Không gọi dataset là &quot;anonymous&quot; chỉ vì đã xóa tên/email.</p>
+<h2 id="15-data-contract-change-process">15. Data contract change process</h2>
+<p>Thay đổi backward-compatible: thêm nullable field thường ít rủi ro. Breaking change: rename/drop/type/semantics cần version, deprecation window, consumer notification và compatibility test.</p>
+<p>Contract gồm cả semantics và SLA: <code>amount</code> đổi từ gross sang net dù type không đổi vẫn là breaking semantic change.</p>
+<h2 id="16-threat-scenario">16. Threat scenario</h2>
+<p>Notebook dev vô tình đọc raw customer PII và ghi sample vào Git:</p>
+<ol>
+<li>Revoke/rotate nếu có credential; remove/restrict artifact.</li>
+<li>Xác định phạm vi clone/fork/log/cache.</li>
+<li>Notify security/data owner theo incident policy.</li>
+<li>Cấp masked non-prod dataset; deny raw PII cho dev role.</li>
+<li>Thêm secret/PII scan và training, nhưng ưu tiên preventive access control.</li>
+</ol>
+<h2 id="17-cau-hoi-co-ap-an">17. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Owner và steward khác nhau?</strong> Owner chịu trách nhiệm/duyệt business; steward vận hành metadata/quality hằng ngày.</li>
+<li><strong>Encryption có thay access control?</strong> Không; người có quyền giải mã vẫn cần least privilege/audit.</li>
+<li><strong>Catalog có tự làm dữ liệu đúng?</strong> Không; cần tests, owner và incident process.</li>
+<li><strong>Retention càng lâu càng tốt?</strong> Không; tăng cost, attack surface và có thể vi phạm policy/pháp lý.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-14.html"><small>← Bài trước</small><b>Advanced Orchestration with Airflow</b></a><a class="next" href="unit-16.html"><small>Bài tiếp →</small><b>DataOps &amp; CI/CD for Data Pipelines</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 15 / 18</footer><script src="../assets/lesson.js"></script></body></html>

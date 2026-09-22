@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 18: Final Review, Report &amp; Q&amp;A"><title>DE01 · 18 · Final Review, Report &amp; Q&amp;A</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="18"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 18 · Final Review, Report &amp; Q&amp;A</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 18 / 18</div><h1>Final Review, Report &amp; Q&amp;A</h1><p>Kể câu chuyện kỹ thuật bằng context, quyết định, trade-off và evidence.</p><div class="lesson-meta"><span class="pill">Review</span><span class="pill">Report</span><span class="pill">Evidence</span><span class="pill">Q&amp;A</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-buc-tranh-tong-the-de01">1. Bức tranh tổng thể DE01</h2>
+<pre><code>Software foundation
+Git + Python + SQL + API
+        |
+Data platform foundation
+Modeling/DWH + Python DE + Spark + dbt
+        |
+Cloud execution
+Azure infrastructure + storage + batch + streaming
+        |
+Production readiness
+Monitoring + Airflow + governance/security + CI/CD
+        |
+Capstone: pipeline tạo dữ liệu đáng tin cho report/decision</code></pre>
+<p>Một Data Engineer junior cần giải thích được dữ liệu đi từ đâu tới đâu, failure ở đâu, cách rerun, cách biết kết quả đúng và cách không làm lộ dữ liệu.</p>
+<h2 id="2-checklist-kien-thuc-18-unit">2. Checklist kiến thức 18 unit</h2>
+<ol>
+<li><strong>Git</strong>: commit/branch/merge/PR, resolve conflict, không commit secret.</li>
+<li><strong>Python app</strong>: module, dependency, exception, config, test, resource lifecycle.</li>
+<li><strong>SQL/OLTP</strong>: ACID, index, execution order, window function, concurrency.</li>
+<li><strong>API</strong>: contract, validation, status/error, pagination, auth, idempotency.</li>
+<li><strong>DWH</strong>: OLTP/OLAP, grain, fact/dim, SCD, Medallion.</li>
+<li><strong>Python DE</strong>: chunk/generator, watermark, retry, audit.</li>
+<li><strong>Spark</strong>: driver/executor, partition, lazy evaluation, shuffle/skew.</li>
+<li><strong>dbt</strong>: model, <code>ref/source</code>, materialization, test, snapshot, docs.</li>
+<li><strong>Azure core</strong>: resource hierarchy, Entra/RBAC, network, cost.</li>
+<li><strong>Storage</strong>: ADLS Gen2, formats, partition, lifecycle, ACL.</li>
+<li><strong>Batch</strong>: ADF concepts, incremental/CDC, idempotency, backfill.</li>
+<li><strong>Streaming</strong>: partition, offset, consumer group, late/duplicate event.</li>
+<li><strong>Operations</strong>: logs/metrics/traces, SLI/SLO, alert, incident.</li>
+<li><strong>Airflow</strong>: DAG/task/data interval, retry, XCom, catchup/backfill.</li>
+<li><strong>Governance</strong>: owner, catalog, lineage, classification, retention.</li>
+<li><strong>DataOps</strong>: CI/CD, test pyramid, migration, artifact, rollback.</li>
+<li><strong>Capstone</strong>: tích hợp các phần và chứng minh reliability.</li>
+<li><strong>Report/Q&amp;A</strong>: kể được câu chuyện từ problem → evidence → result.</li>
+</ol>
+<p>Nếu chưa giải thích được một dòng bằng ví dụ cụ thể, đó là phần cần ôn lại.</p>
+<h2 id="3-mau-final-report">3. Mẫu final report</h2>
+<h3 id="executive-summary">Executive summary</h3>
+<ul>
+<li>Business problem và người sử dụng.</li>
+<li>Kết quả/KPI chính.</li>
+<li>Phạm vi đã làm và chưa làm.</li>
+</ul>
+<h3 id="architecture">Architecture</h3>
+<ul>
+<li>Sơ đồ source → ingest → lakehouse/warehouse → report.</li>
+<li>Vai trò từng component và lý do chọn.</li>
+<li>Batch/streaming cadence, data volume giả định.</li>
+</ul>
+<h3 id="data-design">Data design</h3>
+<ul>
+<li>Source contract và Medallion mapping.</li>
+<li>Fact/dimension, grain, keys, SCD.</li>
+<li>KPI glossary và data dictionary.</li>
+</ul>
+<h3 id="reliability-and-operations">Reliability and operations</h3>
+<ul>
+<li>Idempotency, retry, timeout, quarantine.</li>
+<li>Watermark/offset, late data, replay/backfill.</li>
+<li>Logs, metrics, alerts, SLO và runbook.</li>
+</ul>
+<h3 id="security-and-governance">Security and governance</h3>
+<ul>
+<li>Identity, RBAC/ACL, secret, network.</li>
+<li>Classification, masking, lineage, retention.</li>
+</ul>
+<h3 id="delivery-and-quality">Delivery and quality</h3>
+<ul>
+<li>Git/PR/CI/CD flow.</li>
+<li>Test strategy và reconciliation evidence.</li>
+<li>Deployment/rollback/data recovery.</li>
+</ul>
+<h3 id="results-and-limitations">Results and limitations</h3>
+<ul>
+<li>Performance/cost/result đo được.</li>
+<li>Failure drill và bằng chứng recovery.</li>
+<li>Trade-off, technical debt và next steps ưu tiên.</li>
+</ul>
+<h2 id="4-evidence-nen-inh-kem">4. Evidence nên đính kèm</h2>
+<ul>
+<li>Commit/release ID và architecture diagram.</li>
+<li>Screenshot hoặc export của successful run.</li>
+<li>Quality test result và reconciliation table.</li>
+<li>Query plan/Spark UI khi nói về performance.</li>
+<li>Dashboard có freshness timestamp.</li>
+<li>Alert/runbook và một incident drill.</li>
+<li>Cost estimate/actual nhỏ nhất có thể đo.</li>
+</ul>
+<p>Không chỉ viết &quot;pipeline scalable/secure&quot;; phải chỉ ra cơ chế và bằng chứng.</p>
+<h2 id="5-cach-tra-loi-q-a-ky-thuat">5. Cách trả lời Q&amp;A kỹ thuật</h2>
+<p>Dùng cấu trúc:</p>
+<pre><code>Context -&gt; Decision -&gt; Trade-off -&gt; Evidence -&gt; Next step</code></pre>
+<p>Ví dụ: &quot;Dữ liệu orders tăng theo ngày và cần rerun từng ngày, nên tôi partition theo <code>order_date</code>. Điều này hỗ trợ pruning/backfill nhưng tạo small files nếu batch nhỏ; tôi theo dõi file count và compact theo lịch. Query thử nghiệm cho thấy bytes scanned giảm...&quot;</p>
+<p>Nếu chưa biết: nói rõ giả định, nêu cách đo/kiểm chứng, không đoán một con số tuyệt đối.</p>
+<h2 id="6-bo-cau-hoi-tu-kiem-tra">6. Bộ câu hỏi tự kiểm tra</h2>
+<h3 id="modeling">Modeling</h3>
+<ul>
+<li>Grain sai gây double-count thế nào?</li>
+<li>SCD Type 1 và 2 khác nhau ra sao?</li>
+<li>Late-arriving dimension/fact được xử lý thế nào?</li>
+</ul>
+<h3 id="pipeline">Pipeline</h3>
+<ul>
+<li>Rerun cùng batch có tạo duplicate không? Chứng minh bằng gì?</li>
+<li>Watermark cập nhật lúc nào? Nếu load target fail thì sao?</li>
+<li>Khi schema nguồn đổi, hệ thống fail rõ hay âm thầm sai?</li>
+</ul>
+<h3 id="spark-dbt">Spark/dbt</h3>
+<ul>
+<li>Shuffle là gì và nhận ra ở đâu?</li>
+<li>Vì sao tránh Python UDF khi built-in đủ dùng?</li>
+<li><code>ref()</code> tạo giá trị gì ngoài thay tên bảng?</li>
+</ul>
+<h3 id="azure-operations">Azure/operations</h3>
+<ul>
+<li>Managed identity khác secret hard-code thế nào?</li>
+<li>Job xanh nhưng dashboard thiếu dữ liệu: kiểm tra gì?</li>
+<li>RPO/RTO của pipeline là gì và đã thử recovery chưa?</li>
+</ul>
+<h3 id="security-governance">Security/governance</h3>
+<ul>
+<li>Ai sở hữu KPI doanh thu?</li>
+<li>Dữ liệu nào là PII và có xuất hiện trong log/dev không?</li>
+<li>Xóa một khách hàng phải ảnh hưởng những lớp/bản sao nào?</li>
+</ul>
+<h2 id="7-phan-biet-symptom-va-root-cause">7. Phân biệt symptom và root cause</h2>
+<p>Ví dụ dashboard sai chỉ là symptom. Root cause có thể là source thiếu, watermark skip, Silver join loss, Gold sai grain, semantic relationship hoặc visual filter. Điều tra theo lineage với count/control total thay vì sửa ngay dashboard.</p>
+<p>Tương tự, &quot;thêm cluster&quot; không phải mặc định cho Spark chậm; có thể root cause là skew, shuffle, small files hoặc query plan.</p>
+<h2 id="8-ke-hoach-on-tap-90-phut">8. Kế hoạch ôn tập 90 phút</h2>
+<ul>
+<li>20 phút: vẽ lại end-to-end architecture không nhìn note.</li>
+<li>20 phút: giải thích grain/SCD/watermark/idempotency bằng ví dụ orders.</li>
+<li>20 phút: lần theo một failure từ alert tới recovery.</li>
+<li>15 phút: trình bày capstone theo demo script.</li>
+<li>15 phút: trả lời ngẫu nhiên 5 câu ở trên và ghi gap cần học lại.</li>
+</ul>
+<h2 id="9-final-readiness-checklist">9. Final readiness checklist</h2>
+<ul>
+<li><span class="check"></span>Giải thích được toàn pipeline trong 3 phút và 10 phút.</li>
+<li><span class="check"></span>Demo không cần thao tác bí mật/thủ công ngoài tài liệu.</li>
+<li><span class="check"></span>Số liệu dashboard có reconciliation evidence.</li>
+<li><span class="check"></span>Biết limitation và trade-off, không overclaim.</li>
+<li><span class="check"></span>Có runbook, rollback/recovery và teardown cloud resource.</li>
+<li><span class="check"></span>Report ghi rõ link code, version, ngày dữ liệu và owner.</li>
+</ul>
+<h2 id="10-mau-tra-loi-hoan-chinh">10. Mẫu trả lời hoàn chỉnh</h2>
+<p><strong>Câu hỏi: Vì sao chọn batch thay streaming?</strong></p>
+<blockquote>Dashboard chỉ cần hoàn tất trước 07:00 hằng ngày và nguồn hiện cung cấp incremental SQL. Batch giảm độ phức tạp checkpoint, late-event state và vận hành. Pipeline daily hiện hoàn tất trong 24 phút, còn nhiều margin so SLA. Nếu business yêu cầu fraud/ops trong vài phút, tôi sẽ tách use case đó sang Event Hubs/stream processor thay vì chuyển toàn platform sang streaming.</blockquote>
+<p>Câu trả lời có requirement, decision, evidence, trade-off và trigger thay đổi.</p>
+<p><strong>Câu hỏi: Làm sao chứng minh idempotent?</strong></p>
+<blockquote>Tôi chạy cùng <code>process_date</code> và input manifest hai lần. Target dùng merge theo order item ID và overwrite aggregate của đúng partition. Sau lần hai, row count, distinct key và control totals không đổi; audit vẫn ghi hai attempts. Test này chạy trong integration suite.</blockquote>
+<h2 id="11-cac-muc-cau-tra-loi">11. Các mức câu trả lời</h2>
+<ul>
+<li><strong>Yếu</strong>: chỉ nêu tên công nghệ — &quot;dùng Spark vì big data&quot;.</li>
+<li><strong>Đạt DE01</strong>: nối công nghệ với workload — partition/shuffle, volume và SLA.</li>
+<li><strong>Tốt</strong>: thêm evidence, failure mode, cost và điều kiện đổi quyết định.</li>
+</ul>
+<p>Không cần giả vờ biết hết. Một câu &quot;tôi chưa đo phần này; tôi sẽ kiểm tra metric X bằng thử nghiệm Y&quot; đáng tin hơn con số đoán.</p>
+<h2 id="12-architecture-review-checklist">12. Architecture review checklist</h2>
+<ul>
+<li>Mỗi arrow trên sơ đồ có protocol, identity, data format và failure mode chưa?</li>
+<li>Source of truth và system of record là gì?</li>
+<li>Progress/watermark/checkpoint lưu ở đâu?</li>
+<li>Data contract/schema evolution xử lý ra sao?</li>
+<li>Có đường replay từ raw và publish atomic không?</li>
+<li>Consumer biết freshness/quality status thế nào?</li>
+<li>Cost, owner, RPO/RTO và teardown đã rõ chưa?</li>
+</ul>
+<h2 id="13-bai-mock-interview-20-phut">13. Bài mock interview 20 phút</h2>
+<ol>
+<li>3 phút: giải thích architecture không dùng jargon thừa.</li>
+<li>4 phút: đi sâu một design decision.</li>
+<li>4 phút: xử lý incident dashboard sai.</li>
+<li>4 phút: giải thích idempotency/backfill bằng dữ liệu cụ thể.</li>
+<li>3 phút: security/governance/cost.</li>
+<li>2 phút: limitation và next step.</li>
+</ol>
+<p>Ghi âm, nghe lại và đánh dấu câu thiếu evidence hoặc dùng khái niệm chưa giải thích.</p>
+<h2 id="14-rubric-tu-cham">14. Rubric tự chấm</h2>
+<table><thead><tr><th>Tiêu chí</th><th>1 - Chưa rõ</th><th>2 - Đạt</th><th>3 - Tốt</th></tr></thead><tbody><tr><td>Correctness</td><td>Không có đối soát</td><td>Có test/count</td><td>Có reconciliation + edge cases</td></tr><tr><td>Reliability</td><td>Retry chung chung</td><td>Rerun/backfill rõ</td><td>Failure drill + evidence</td></tr><tr><td>Modeling</td><td>Kể tên fact/dim</td><td>Grain/key đúng</td><td>History/late data/KPI rõ</td></tr><tr><td>Operations</td><td>Có log</td><td>Metric/alert/runbook</td><td>SLO + incident learning</td></tr><tr><td>Communication</td><td>Kể tool</td><td>Nêu decision</td><td>Trade-off + evidence + limits</td></tr></tbody></table></main></div>
+<nav class="lesson-nav"><a href="unit-17.html"><small>← Bài trước</small><b>Capstone: End-to-End Analytics Pipeline</b></a><a class="next" href="../index.html"><small>Hoàn tất</small><b>Về Learning Hub</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 18 / 18</footer><script src="../assets/lesson.js"></script></body></html>

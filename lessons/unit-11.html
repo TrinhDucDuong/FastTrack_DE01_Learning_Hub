@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 11: Batch Data Processing on Azure"><title>DE01 · 11 · Batch Data Processing on Azure</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="11"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 11 · Batch Data Processing on Azure</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 11 / 18</div><h1>Batch Data Processing on Azure</h1><p>Orchestrate batch với watermark, CDC, quality gate và backfill.</p><div class="lesson-meta"><span class="pill">ADF</span><span class="pill">Batch</span><span class="pill">CDC</span><span class="pill">Backfill</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-batch-pipeline-la-gi">1. Batch pipeline là gì?</h2>
+<p>Batch xử lý một tập dữ liệu hữu hạn theo lịch hoặc sự kiện: mỗi giờ, mỗi ngày hoặc khi file đến. Mục tiêu không chỉ là copy thành công mà còn đúng dữ liệu, rerun an toàn và trace được.</p>
+<pre><code>Source -&gt; Ingest -&gt; Bronze -&gt; Validate/Transform -&gt; Silver -&gt; Gold -&gt; Publish
+              \-&gt; audit, metrics, alert, quarantine</code></pre>
+<h2 id="2-azure-data-factory-adf-mental-model">2. Azure Data Factory (ADF) mental model</h2>
+<ul>
+<li><strong>Pipeline</strong>: nhóm hoạt động thành một workflow.</li>
+<li><strong>Activity</strong>: một bước copy, transform, lookup, execute...</li>
+<li><strong>Dataset</strong>: mô tả shape/location dữ liệu dùng bởi activity.</li>
+<li><strong>Linked service</strong>: thông tin kết nối tới data store/compute.</li>
+<li><strong>Integration Runtime (IR)</strong>: hạ tầng kết nối/di chuyển/dispatch compute.</li>
+<li><strong>Trigger</strong>: lịch, tumbling window hoặc sự kiện khởi chạy.</li>
+<li><strong>Parameter/variable</strong>: tái sử dụng pipeline theo bảng/ngày/môi trường.</li>
+</ul>
+<p>ADF chủ yếu orchestration/data movement; transformation lớn có thể giao cho Spark/Databricks/SQL engine. Microsoft hiện cũng định hướng người mới xem Data Factory trong Microsoft Fabric; vẫn cần hiểu ADF cho hệ thống hiện hữu.</p>
+<h2 id="3-full-load-va-incremental-load">3. Full load và incremental load</h2>
+<ul>
+<li><strong>Full</strong>: đơn giản nhưng tốn thời gian/chi phí, phù hợp bảng nhỏ.</li>
+<li><strong>Watermark</strong>: lấy record có <code>updated_at</code> mới; phải xử lý cùng timestamp và late update.</li>
+<li><strong>CDC</strong>: đọc insert/update/delete từ change log; cần quản lý offset và retention.</li>
+<li><strong>Partition/file discovery</strong>: lấy folder/file mới; cần manifest và chống file trùng/dở dang.</li>
+</ul>
+<p>Watermark pattern:</p>
+<ol>
+<li>Đọc <code>last_successful_watermark</code>.</li>
+<li>Chốt <code>upper_bound</code> cho run hiện tại.</li>
+<li>Extract <code>(last - lookback, upper_bound]</code>.</li>
+<li>Merge/deduplicate target.</li>
+<li>Validate và commit.</li>
+<li>Chỉ sau đó cập nhật watermark thành <code>upper_bound</code>.</li>
+</ol>
+<h2 id="4-idempotency-va-partial-failure">4. Idempotency và partial failure</h2>
+<ul>
+<li>Mỗi run có <code>run_id</code>, <code>batch_id</code>, input range.</li>
+<li>Copy raw vào path deterministic hoặc ghi manifest trạng thái.</li>
+<li>Transform ghi staging trước, validate rồi publish/merge.</li>
+<li>Không đánh dấu thành công nếu chỉ một phần target hoàn tất.</li>
+<li>Nếu chấp nhận partial success, ghi rõ record thành công/lỗi và cơ chế replay đúng phần lỗi.</li>
+</ul>
+<p>Retry chỉ dành cho lỗi transient. Dùng exponential backoff + giới hạn retry; sai schema/credential không hết hạn thì cần fail rõ và alert.</p>
+<h2 id="5-metadata-driven-pipeline">5. Metadata-driven pipeline</h2>
+<p>Thay vì copy-paste 100 pipeline, dùng control table:</p>
+<pre><code>source_table | target_path | load_type | watermark_col | enabled
+orders       | bronze/...  | watermark | updated_at    | true
+customers    | bronze/...  | full      | null          | true</code></pre>
+<p>Pipeline đọc metadata, loop từng entity và truyền parameter. Lợi ích: nhất quán, mở rộng nhanh; rủi ro: control table trở thành thành phần quan trọng nên phải validate, version và audit.</p>
+<h2 id="6-data-quality-gates">6. Data quality gates</h2>
+<p>Trước và sau mỗi layer kiểm tra:</p>
+<ul>
+<li>Schema/required columns.</li>
+<li>Row count và distinct business key.</li>
+<li>Null/duplicate/range/domain.</li>
+<li>Control total như tổng amount.</li>
+<li>Freshness và expected volume.</li>
+</ul>
+<p>Zero row không luôn là thành công. So sánh với baseline và business calendar trước khi alert.</p>
+<h2 id="7-failure-zones-va-runbook">7. Failure zones và runbook</h2>
+<table><thead><tr><th>Hiện tượng</th><th>Kiểm tra</th></tr></thead><tbody><tr><td>Connection timeout</td><td>Network, DNS, firewall/private endpoint, credential</td></tr><tr><td>Job không chạy</td><td>Trigger, dependency, disabled pipeline, heartbeat</td></tr><tr><td>Row count giảm</td><td>Source, filter, watermark, join loss</td></tr><tr><td>File corrupt/schema drift</td><td>Contract, delimiter/type, quarantine</td></tr><tr><td>Chậm đột ngột</td><td>Input volume, IR/compute, partition, sink throttling</td></tr><tr><td>Duplicate sau rerun</td><td>Run metadata, merge key, overwrite scope</td></tr></tbody></table>
+<p>Runbook phải trả lời: bước nào hỏng, dữ liệu nào bị ảnh hưởng, rerun có an toàn không, ai cần được báo.</p>
+<h2 id="8-bai-thuc-hanh">8. Bài thực hành</h2>
+<p>Thiết kế pipeline ADF nạp <code>orders</code> hàng ngày:</p>
+<ol>
+<li>Parameter <code>process_date</code> và <code>run_id</code>.</li>
+<li>Copy incremental vào Bronze.</li>
+<li>Kiểm tra source/landing count.</li>
+<li>Gọi transform Silver/Gold.</li>
+<li>Ghi audit table và watermark.</li>
+<li>Alert khi fail, zero records hoặc trễ SLA.</li>
+<li>Backfill một ngày mà không tạo trùng.</li>
+</ol>
+<h2 id="9-checklist">9. Checklist</h2>
+<ul>
+<li><span class="check"></span>Khoảng dữ liệu của mỗi run xác định rõ.</li>
+<li><span class="check"></span>Watermark/offset chỉ commit sau khi toàn pipeline thành công.</li>
+<li><span class="check"></span>Rerun/backfill đã được thử.</li>
+<li><span class="check"></span>Bad data được quarantine, không làm mất toàn bộ batch nếu policy cho phép.</li>
+<li><span class="check"></span>Có metric, alert, lineage và owner.</li>
+</ul>
+<p>Tài liệu chính: <a href="https://learn.microsoft.com/azure/data-factory/introduction" target="_blank" rel="noreferrer">Giới thiệu Azure Data Factory</a>.</p>
+<h2 id="10-integration-runtime-chon-the-nao">10. Integration Runtime chọn thế nào?</h2>
+<ul>
+<li>Azure IR: data movement/dispatch trong cloud và public endpoints hỗ trợ.</li>
+<li>Self-hosted IR: kết nối on-prem/private network; chính máy/VM này cần capacity, patch, HA và monitoring.</li>
+<li>Azure-SSIS IR: chạy SSIS package khi migration/use case cần.</li>
+</ul>
+<p>IR là data path quan trọng. Bottleneck có thể nằm ở source, network, IR hoặc sink; scale IR không chữa source query chậm.</p>
+<h2 id="11-control-flow-production">11. Control flow production</h2>
+<pre><code>Lookup config
+ -&gt; ForEach entity (bounded parallelism)
+   -&gt; Get source watermark/upper bound
+   -&gt; Copy to staging/Bronze
+   -&gt; Validate count/checksum
+   -&gt; Transform Silver/Gold
+   -&gt; Quality gate
+   -&gt; Publish + update watermark
+ -&gt; Summary audit + alert</code></pre>
+<p>ForEach concurrency phải tôn trọng giới hạn source/sink. Một pipeline chạy nhanh hơn nhưng làm production DB timeout là thất bại.</p>
+<h2 id="12-parameter-variable-va-expression">12. Parameter, variable và expression</h2>
+<ul>
+<li>Parameter là input của pipeline/dataset, thường immutable trong run.</li>
+<li>Variable là state nội bộ pipeline; cẩn thận khi thay đổi trong parallel loop.</li>
+<li>Dynamic content tạo path/query, nhưng cần whitelist/escape để tránh tên object không hợp lệ hoặc SQL injection khi build query.</li>
+</ul>
+<p>Ví dụ path deterministic:</p>
+<pre><code>bronze/orders/ingestion_date=2026-09-22/run_id=&lt;run-id&gt;/</code></pre>
+<h2 id="13-copy-performance-checklist">13. Copy performance checklist</h2>
+<ol>
+<li>Đo source query riêng và kiểm tra index/partition.</li>
+<li>Xem bytes/rows, throughput và duration từng activity.</li>
+<li>Kiểm tra parallel copy/partition option phù hợp.</li>
+<li>Kiểm tra sink throttling, file count và network path.</li>
+<li>So sánh DIU/IR capacity trước và sau thay đổi.</li>
+</ol>
+<p>Không tối ưu bằng cách tăng parallelism vô hạn; có thể tạo too many small files hoặc rate limit.</p>
+<h2 id="14-backfill-design">14. Backfill design</h2>
+<p>Backfill là workload hạng nhất, không phải sửa tay:</p>
+<ul>
+<li>Input <code>from_date/to_date</code> hoặc list interval.</li>
+<li>Cùng transformation code với daily run.</li>
+<li>Pool/concurrency riêng để không tranh tài nguyên production.</li>
+<li>Output overwrite/merge đúng partition.</li>
+<li>Audit link giữa backfill run và original intervals.</li>
+<li>Re-refresh downstream đúng phạm vi.</li>
+</ul>
+<h2 id="15-failure-walkthrough">15. Failure walkthrough</h2>
+<p>Case: Copy activity thành công nhưng Silver row count giảm 35%.</p>
+<ol>
+<li>Không publish Gold.</li>
+<li>So source count và Bronze count để loại trừ ingestion.</li>
+<li>So parse rejects, dedup và filter counts.</li>
+<li>Kiểm tra join loss theo key/null/reference data.</li>
+<li>Xác định code/config release gần nhất.</li>
+<li>Fix, rerun interval idempotently, reconcile rồi publish.</li>
+</ol>
+<p>Pipeline status &quot;Succeeded&quot; ở từng activity không thay data quality gate.</p>
+<h2 id="16-cau-hoi-co-ap-an">16. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Watermark nên lấy <code>max(updated_at)</code> từ source sau run không?</strong> Nên chốt upper bound trước extract; nếu không record phát sinh giữa run có thể bị skip.</li>
+<li><strong>Copy activity có biến ADF thành compute engine?</strong> Không; nó chủ yếu move data, transform lớn nên giao engine phù hợp.</li>
+<li><strong>Tại sao metadata-driven pipeline khó hơn lúc đầu?</strong> Cần contract/config validation và generic error handling, đổi lại scale nhiều entity nhất quán.</li>
+<li><strong>Retry mọi lỗi schema có ích không?</strong> Không; lỗi permanent chỉ tốn thời gian và che incident.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-10.html"><small>← Bài trước</small><b>Data Storage Solutions on Azure</b></a><a class="next" href="unit-12.html"><small>Bài tiếp →</small><b>Real-time Data Streaming on Azure</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 11 / 18</footer><script src="../assets/lesson.js"></script></body></html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 2: Python for Application Development"><title>DE01 · 02 · Python for Application Development</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="2"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 02 · Python for Application Development</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 02 / 18</div><h1>Python for Application Development</h1><p>Viết ứng dụng module hóa, quản lý dependency, lỗi và resource đúng cách.</p><div class="lesson-meta"><span class="pill">Python</span><span class="pill">Typing</span><span class="pill">Exceptions</span><span class="pill">Testing</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content">
+<h2 id="1-project-va-dependency">1. Project và dependency</h2>
+<pre><code>python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt</code></pre>
+<p>Virtual environment cô lập dependency. Pin/lock phiên bản để build tái lập; không commit <code>.venv</code>.</p>
+<pre><code>app/
+  main.py
+  config.py
+  services/
+  repositories/
+tests/
+pyproject.toml
+README.md</code></pre>
+<h2 id="2-function-type-va-layer">2. Function, type và layer</h2>
+<p>Hàm nên có một trách nhiệm, input/output rõ, ít side effect:</p>
+<pre><code>from decimal import Decimal
+
+def net_amount(quantity: int, price: Decimal, discount: Decimal) -&gt; Decimal:
+    if quantity &lt;= 0:
+        raise ValueError(&quot;quantity must be positive&quot;)
+    return quantity * price - discount</code></pre>
+<p>Type hint giúp đọc/static check nhưng không tự validate runtime. Dùng <code>Decimal</code> cho tiền khi cần chính xác. Tách transport (API), service (business rule), repository (data access); truyền dependency vào thay vì tạo cứng bên trong để dễ test.</p>
+<h2 id="3-exception-va-resource-lifecycle">3. Exception và resource lifecycle</h2>
+<ul>
+<li>Raise exception có ý nghĩa; catch ở layer có thể xử lý hoặc thêm context.</li>
+<li>Giữ nguyên nguyên nhân bằng <code>raise ... from exc</code>.</li>
+<li>Không <code>except Exception: pass</code>.</li>
+<li>Không trả stack trace/SQL/secret cho client.</li>
+<li>Retry có giới hạn cho timeout/network/rate limit; validation/auth thường không retry.</li>
+</ul>
+<p>Dùng context manager cho file/connection. Database transaction cần commit/rollback rõ. HTTP/database pool thường sống theo application lifecycle, không tạo pool mới cho mỗi request.</p>
+<h2 id="4-config-va-secret">4. Config và secret</h2>
+<ul>
+<li>Config thay đổi theo môi trường, không hard-code trong business logic.</li>
+<li>Environment variable/typed settings cho runtime config.</li>
+<li>Secret manager cho token/password; <code>.env</code> local phải bị ignore.</li>
+<li>Validate config khi app start để fail rõ.</li>
+<li>Không log giá trị secret hoặc raw PII.</li>
+</ul>
+<h2 id="5-sync-async-va-concurrency">5. Sync, async và concurrency</h2>
+<p><code>async</code> hữu ích khi chờ nhiều I/O, không tự làm CPU work nhanh. Không gọi thư viện blocking lâu trong event loop. Luôn có timeout, concurrency limit và backpressure khi gọi downstream. Chọn sync nếu workload đơn giản và code rõ hơn.</p>
+<h2 id="6-logging-va-test">6. Logging và test</h2>
+<p>Log có timestamp, severity, correlation ID và context; production không phụ thuộc vào <code>print</code>.</p>
+<ul>
+<li>Unit test pure business logic.</li>
+<li>Integration test database/API boundary.</li>
+<li>Mock hệ thống bên ngoài, không mock mọi implementation detail.</li>
+<li>Test happy path, boundary và failure path.</li>
+</ul>
+<pre><code>def test_net_amount():
+    assert net_amount(2, Decimal(&quot;10&quot;), Decimal(&quot;1.5&quot;)) == Decimal(&quot;18.5&quot;)</code></pre>
+<h2 id="7-bai-thuc-hanh-va-checklist">7. Bài thực hành và checklist</h2>
+<p>Tạo ứng dụng order nhỏ: router/service/repository, config qua environment, input validation, custom exception, transaction/context đúng, structured log và unit/integration tests.</p>
+<ul>
+<li><span class="check"></span>Dependency cô lập và tái lập được.</li>
+<li><span class="check"></span>Business logic tách khỏi I/O/transport.</li>
+<li><span class="check"></span>Exception có context, resource luôn đóng.</li>
+<li><span class="check"></span>Secret không hard-code/log/commit.</li>
+<li><span class="check"></span>Có timeout, validation và test failure path.</li>
+</ul>
+<h2 id="8-python-object-model-o-muc-can-thiet">8. Python object model ở mức cần thiết</h2>
+<ul>
+<li>Biến giữ reference tới object, không phải &quot;hộp chứa giá trị&quot; độc lập.</li>
+<li>List/dict là mutable; string/tuple/int là immutable.</li>
+<li>Default argument được tạo một lần khi định nghĩa hàm, vì vậy tránh <code>def f(items=[])</code>.</li>
+</ul>
+<pre><code>def add_item(item: str, items: list[str] | None = None) -&gt; list[str]:
+    result = [] if items is None else list(items)
+    result.append(item)
+    return result</code></pre>
+<p>Copy nông chỉ tạo container mới; object lồng nhau vẫn dùng chung reference. Đây là nguồn bug khi sửa config/dict dùng lại giữa request.</p>
+<h2 id="9-dependency-injection-bang-vi-du">9. Dependency injection bằng ví dụ</h2>
+<pre><code>from typing import Protocol
+
+class OrderRepository(Protocol):
+    def get(self, order_id: int) -&gt; dict | None: ...
+
+class OrderService:
+    def __init__(self, repository: OrderRepository):
+        self.repository = repository
+
+    def require_order(self, order_id: int) -&gt; dict:
+        order = self.repository.get(order_id)
+        if order is None:
+            raise OrderNotFound(order_id)
+        return order</code></pre>
+<p>Service chỉ phụ thuộc vào contract nhỏ. Unit test có thể dùng fake repository trong memory; production truyền repository kết nối database.</p>
+<h2 id="10-http-client-ang-tin">10. HTTP client đáng tin</h2>
+<pre><code>import httpx
+
+timeout = httpx.Timeout(connect=2.0, read=5.0, write=5.0, pool=1.0)
+with httpx.Client(timeout=timeout) as client:
+    response = client.get(url)
+    response.raise_for_status()</code></pre>
+<p>Phân biệt connect/read timeout để biết đang kẹt ở đâu. Retry GET thường an toàn hơn POST; POST chỉ retry khi API có idempotency key hoặc contract tương đương. Đặt concurrency limit để không tự tạo &quot;thundering herd&quot; khi downstream phục hồi.</p>
+<h2 id="11-transaction-boundary">11. Transaction boundary</h2>
+<p>Một use case nghiệp vụ nên xác định transaction boundary rõ:</p>
+<pre><code>create order -&gt; reserve stock -&gt; save order -&gt; commit</code></pre>
+<p>Không giữ database transaction mở trong lúc chờ HTTP lâu nếu tránh được. Nếu quy trình đi qua nhiều service, không thể dùng một transaction database chung; cần saga/compensation, outbox hoặc trạng thái trung gian tùy bài toán.</p>
+<h2 id="12-test-theo-arrange-act-assert">12. Test theo Arrange–Act–Assert</h2>
+<pre><code>def test_missing_order_raises():
+    # Arrange
+    repository = FakeOrderRepository({})
+    service = OrderService(repository)
+
+    # Act + Assert
+    with pytest.raises(OrderNotFound):
+        service.require_order(999)</code></pre>
+<p>Test hành vi public, không khóa chặt vào private method. Với thời gian, random và network, truyền dependency/fake clock để test deterministic.</p>
+<h2 id="13-cau-hoi-tu-kiem-tra-co-ap-an">13. Câu hỏi tự kiểm tra có đáp án</h2>
+<ol>
+<li><strong>Type hint có chặn string truyền vào tham số int không?</strong> Không tự động; cần static checker hoặc runtime validation.</li>
+<li><strong>Vì sao không tạo DB connection cho từng query?</strong> Tốn handshake và dễ cạn connection; dùng pool theo lifecycle.</li>
+<li><strong>Khi nào async có lợi?</strong> Nhiều tác vụ I/O chờ đợi và thư viện toàn tuyến hỗ trợ non-blocking.</li>
+<li><strong>Vì sao business logic nên gần pure function?</strong> Dễ hiểu, test nhanh và không phụ thuộc môi trường.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-01.html"><small>← Bài trước</small><b>Version Control with Git</b></a><a class="next" href="unit-03.html"><small>Bài tiếp →</small><b>Relational Databases &amp; Advanced SQL</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 02 / 18</footer><script src="../assets/lesson.js"></script></body></html>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 8: Data Transformation with dbt"><title>DE01 · 08 · Data Transformation with dbt</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="8"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 08 · Data Transformation with dbt</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 08 / 18</div><h1>Data Transformation with dbt</h1><p>Đưa transformation SQL vào dependency graph, test, Git và documentation.</p><div class="lesson-meta"><span class="pill">dbt</span><span class="pill">Models</span><span class="pill">Tests</span><span class="pill">Lineage</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-dbt-giai-quyet-gi">1. dbt giải quyết gì?</h2>
+<p>dbt quản lý phần <strong>Transform</strong> trong ELT: viết transformation bằng SQL/model, dựng dependency graph, chạy test, sinh documentation và đưa logic dữ liệu vào Git để review.</p>
+<p>dbt không phải công cụ ingest và không tự lưu dữ liệu. SQL được compile rồi chạy trên warehouse/lakehouse đích.</p>
+<h2 id="2-cac-khai-niem-chinh">2. Các khái niệm chính</h2>
+<ul>
+<li><strong>Source</strong>: bảng do hệ thống khác nạp vào.</li>
+<li><strong>Model</strong>: một file <code>SELECT</code>; dbt materialize thành view/table/incremental/ephemeral.</li>
+<li><strong><code>ref()</code></strong>: tham chiếu model khác và tạo dependency.</li>
+<li><strong><code>source()</code></strong>: tham chiếu source đã khai báo.</li>
+<li><strong>Seed</strong>: file CSV nhỏ được quản lý trong project.</li>
+<li><strong>Snapshot</strong>: lưu lịch sử thay đổi, thường phục vụ SCD Type 2.</li>
+<li><strong>Test</strong>: assertion về chất lượng dữ liệu.</li>
+<li><strong>Macro</strong>: đoạn Jinja/SQL tái sử dụng.</li>
+</ul>
+<pre><code>-- models/marts/fct_orders.sql
+select
+    order_id,
+    customer_id,
+    order_date,
+    amount
+from {{ ref('stg_orders') }}
+where status = 'completed'</code></pre>
+<p>Không hard-code <code>database.schema.table</code> khi có thể dùng <code>ref/source</code>.</p>
+<h2 id="3-cau-truc-project-goi-y">3. Cấu trúc project gợi ý</h2>
+<pre><code>models/
+  staging/       -- rename, cast, chuẩn hóa gần nguồn
+  intermediate/  -- logic trung gian, join/reuse
+  marts/         -- fact, dimension, KPI cho business
+seeds/
+snapshots/
+tests/
+macros/
+dbt_project.yml</code></pre>
+<p>Credentials thường nằm ngoài repository (ví dụ <code>profiles.yml</code>) hoặc ở secret manager của môi trường chạy.</p>
+<h2 id="4-materialization">4. Materialization</h2>
+<table><thead><tr><th>Loại</th><th>Dùng khi</th><th>Trade-off</th></tr></thead><tbody><tr><td>view</td><td>Nhẹ, luôn cần dữ liệu mới</td><td>Query downstream có thể chậm</td></tr><tr><td>table</td><td>Query nhiều, cần tốc độ</td><td>Rebuild tốn thời gian/chi phí</td></tr><tr><td>incremental</td><td>Bảng lớn, chỉ xử lý phần thay đổi</td><td>Logic phức tạp hơn, phải xử lý late data</td></tr><tr><td>ephemeral</td><td>Logic nhỏ chỉ để tái sử dụng</td><td>Compile thành CTE, khó debug nếu lạm dụng</td></tr></tbody></table>
+<p>Incremental model cần unique key, filter dữ liệu mới và chiến lược cho record đến muộn. Phải test cả full refresh lẫn incremental/rerun.</p>
+<pre><code>{{ config(materialized='incremental', unique_key='order_id') }}
+
+select * from {{ source('raw', 'orders') }}
+{% if is_incremental() %}
+where updated_at &gt;= (select dateadd(hour, -2, max(updated_at)) from {{ this }})
+{% endif %}</code></pre>
+<p>Lookback hai giờ chỉ là ví dụ; cửa sổ phải dựa trên SLA và đặc điểm nguồn.</p>
+<h2 id="5-data-tests">5. Data tests</h2>
+<p>Trong YAML, khai báo description và test quan trọng:</p>
+<pre><code>models:
+  - name: fct_orders
+    description: One row per order.
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id</code></pre>
+<p>Ngoài <code>unique/not_null/accepted_values/relationships</code>, viết singular test cho rule nghiệp vụ: net amount không âm, completed order phải có payment...</p>
+<h2 id="6-lenh-lam-viec-cot-loi">6. Lệnh làm việc cốt lõi</h2>
+<pre><code>dbt debug              kiểm tra connection/config
+dbt compile            compile Jinja thành SQL
+dbt run                chạy model
+dbt test               chạy test
+dbt build              build + test theo DAG
+dbt docs generate      tạo metadata tài liệu
+dbt docs serve         xem docs cục bộ</code></pre>
+<p>Dùng selection (<code>model+</code>, <code>+model</code>, tag/path/state) để chạy đúng model và dependency cần thiết.</p>
+<h2 id="7-workflow-git-va-moi-truong">7. Workflow Git và môi trường</h2>
+<ol>
+<li>Developer sửa model ở schema dev riêng.</li>
+<li>Chạy format/lint, unit/data tests và <code>dbt build</code> phần bị ảnh hưởng.</li>
+<li>Pull request review cả SQL, grain, test và tác động downstream.</li>
+<li>CI dùng target tạm/isolated.</li>
+<li>Merge rồi deploy job production; artifact và run result được lưu để audit.</li>
+</ol>
+<p>Không dùng production credential ở máy cá nhân. Không cho CI ghi vào schema production trong bước kiểm tra pull request.</p>
+<h2 id="8-xu-ly-loi">8. Xử lý lỗi</h2>
+<ul>
+<li>Row count giảm: kiểm tra source freshness, filter, watermark và join loss.</li>
+<li>Test relationship fail: tìm orphan key hoặc load order sai.</li>
+<li>KPI đổi bất ngờ: so sánh lineage và commit gần nhất, đối soát từng layer.</li>
+<li>Incremental tạo trùng: kiểm tra unique key, merge strategy, late updates.</li>
+<li>Cost tăng: xem model rebuild toàn bộ, materialization và số lần chạy.</li>
+</ul>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Tạo flow <code>source orders -&gt; stg_orders -&gt; int_order_items -&gt; fct_sales</code>:</p>
+<ul>
+<li>Khai báo source và freshness.</li>
+<li>Dùng <code>ref()</code> cho dependency.</li>
+<li>Thêm descriptions và 4 test cơ bản.</li>
+<li>Cho <code>fct_sales</code> chạy incremental.</li>
+<li>Chứng minh chạy lần hai không tạo trùng.</li>
+<li>Sinh docs và xem lineage graph.</li>
+</ul>
+<h2 id="10-checklist-tu-kiem-tra">10. Checklist tự kiểm tra</h2>
+<ul>
+<li><span class="check"></span>Mỗi model có grain và description.</li>
+<li><span class="check"></span>Dùng <code>ref/source</code>, không hard-code quan hệ.</li>
+<li><span class="check"></span>Có test key, relationship và rule nghiệp vụ.</li>
+<li><span class="check"></span>Incremental xử lý update/late data/rerun.</li>
+<li><span class="check"></span>Secret không nằm trong Git.</li>
+</ul>
+<p>Tài liệu chính: <a href="https://docs.getdbt.com/" target="_blank" rel="noreferrer">dbt Developer Hub</a>.</p>
+<h2 id="11-source-va-source-freshness">11. <code>source()</code> và source freshness</h2>
+<p>Khai báo source biến raw table thành dependency có metadata:</p>
+<pre><code>sources:
+  - name: raw_ecommerce
+    database: ECOM_DWH
+    schema: RAW
+    loaded_at_field: ingestion_ts
+    freshness:
+      warn_after: {count: 2, period: hour}
+      error_after: {count: 6, period: hour}
+    tables:
+      - name: orders</code></pre>
+<p>Freshness test hỏi dữ liệu cuối cùng đến lúc nào, khác với <code>not_null/unique</code> hỏi nội dung có hợp lệ không.</p>
+<h2 id="12-staging-model-convention">12. Staging model convention</h2>
+<p>Staging nên mỏng và gần source: rename, cast, standardize null/status, không nhồi business aggregation.</p>
+<pre><code>with source as (
+    select * from {{ source('raw_ecommerce', 'orders') }}
+), renamed as (
+    select
+        id::number as order_id,
+        user_id::number as customer_id,
+        lower(trim(status)) as order_status,
+        created_at::timestamp as created_at,
+        updated_at::timestamp as updated_at
+    from source
+)
+select * from renamed</code></pre>
+<p>Một source table thường có một staging model chuẩn để downstream không lặp cast/rename.</p>
+<h2 id="13-incremental-cac-cau-hoi-bat-buoc">13. Incremental: các câu hỏi bắt buộc</h2>
+<p>Trước khi chọn incremental, trả lời:</p>
+<ul>
+<li>Cột nào thể hiện thay đổi? Có đáng tin và có timezone không?</li>
+<li>Unique key là gì? Có duplicate từ source không?</li>
+<li>Delete được truyền thế nào?</li>
+<li>Late update tối đa bao lâu?</li>
+<li>Khi logic code đổi, có cần full refresh/backfill không?</li>
+</ul>
+<p>Lookback giảm bỏ sót nhưng tăng scan. <code>MERGE</code> cần deduplicate source trước nếu một key có nhiều update trong batch.</p>
+<h2 id="14-snapshot-va-scd2">14. Snapshot và SCD2</h2>
+<p>Snapshot ghi lịch sử record mutable. Strategy timestamp dùng <code>updated_at</code>; check strategy so sánh cột. Timestamp thường scale/maintain tốt hơn nếu nguồn có cột tin cậy.</p>
+<p>Snapshot không tự giải quyết mọi dimension: vẫn cần rename/map, surrogate key, unknown member và test khoảng hiệu lực trong mart.</p>
+<h2 id="15-test-theo-tang">15. Test theo tầng</h2>
+<ul>
+<li>Staging: accepted values, type/required key, source freshness.</li>
+<li>Intermediate: relationship/cardinality, duplicate sau join.</li>
+<li>Mart: unique grain, not null surrogate keys, business equation.</li>
+<li>Reconciliation: tổng Gold so Silver/source theo cùng scope.</li>
+</ul>
+<pre><code>-- tests/assert_net_amount.sql: trả row sai; zero row = pass
+select *
+from {{ ref('fct_sales') }}
+where abs(net_amount - (gross_amount - discount_amount)) &gt; 0.01</code></pre>
+<h2 id="16-jinja-va-macro-dung-vua-u">16. Jinja và macro: dùng vừa đủ</h2>
+<p>Jinja tạo SQL lúc compile, không chạy theo từng row. Macro tốt cho pattern lặp có semantics ổn định; lạm dụng abstraction khiến compiled SQL khó đọc. Luôn xem output trong <code>target/compiled</code> khi debug.</p>
+<h2 id="17-ci-selection-va-state">17. CI selection và state</h2>
+<p>Trong PR, mục tiêu là build model thay đổi và downstream bị ảnh hưởng trong schema cô lập. State/defer có thể giúp tham chiếu production artifact cho model không đổi, nhưng CI identity không được ghi vào production.</p>
+<p>Artifact quan trọng: <code>manifest.json</code>, <code>run_results.json</code>, catalog; dùng cho lineage, run audit và so sánh state.</p>
+<h2 id="18-cau-hoi-co-ap-an">18. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>dbt có move data từ API vào warehouse không?</strong> Không; dbt tập trung transform dữ liệu đã có trong platform.</li>
+<li><strong><code>dbt run</code> khác <code>dbt build</code>?</strong> Build chạy resources/test theo DAG; run chủ yếu chạy models.</li>
+<li><strong>Test fail có tự rollback model đã build trước đó không?</strong> Không mặc định toàn DAG; thiết kế promotion/quality gate phù hợp.</li>
+<li><strong>Incremental luôn rẻ hơn table?</strong> Không; merge scan lớn hoặc logic phức tạp có thể đắt, cần đo.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-07.html"><small>← Bài trước</small><b>Distributed Processing with Spark &amp; PySpark</b></a><a class="next" href="unit-09.html"><small>Bài tiếp →</small><b>Azure Fundamentals &amp; Core Infrastructure</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 08 / 18</footer><script src="../assets/lesson.js"></script></body></html>

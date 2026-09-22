@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 14: Advanced Orchestration with Airflow"><title>DE01 · 14 · Advanced Orchestration with Airflow</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="14"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 14 · Advanced Orchestration with Airflow</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 14 / 18</div><h1>Advanced Orchestration with Airflow</h1><p>Biến dependency, schedule, retry và backfill thành workflow-as-code.</p><div class="lesson-meta"><span class="pill">Airflow</span><span class="pill">DAG</span><span class="pill">Data Interval</span><span class="pill">Backfill</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-airflow-lam-gi">1. Airflow làm gì?</h2>
+<p>Airflow xây và chạy workflow theo DAG (Directed Acyclic Graph). DAG mô tả task, dependency, schedule, retry và operational metadata. Airflow là orchestrator; không nên nhét dữ liệu lớn vào chính metadata database hoặc XCom.</p>
+<pre><code>Dag processor parses DAGs -&gt; metadata database
+Scheduler finds ready tasks -&gt; Executor -&gt; Workers run tasks
+API/UI shows state and supports operations
+Triggerer handles deferred work (khi dùng)</code></pre>
+<p>Thành phần cụ thể thay đổi theo major version/deployment, nên luôn đối chiếu docs đúng version đang cài.</p>
+<h2 id="2-khai-niem-quan-trong">2. Khái niệm quan trọng</h2>
+<ul>
+<li><strong>DAG</strong>: workflow không có vòng lặp dependency.</li>
+<li><strong>Task</strong>: đơn vị công việc.</li>
+<li><strong>DAG Run / Task Instance</strong>: lần chạy cụ thể.</li>
+<li><strong>Data interval</strong>: khoảng dữ liệu mà một run chịu trách nhiệm.</li>
+<li><strong>Operator/TaskFlow task</strong>: template để thực hiện task.</li>
+<li><strong>Sensor</strong>: đợi điều kiện/sự kiện; ưu tiên deferrable khi chờ lâu.</li>
+<li><strong>XCom</strong>: metadata nhỏ giữa task; không truyền DataFrame/file lớn.</li>
+<li><strong>Connection/Variable</strong>: cấu hình runtime; secret cần backend phù hợp.</li>
+<li><strong>Pool</strong>: giới hạn concurrency với hệ thống downstream.</li>
+</ul>
+<h2 id="3-lich-va-data-interval">3. Lịch và data interval</h2>
+<p>DAG daily thường chạy sau khi khoảng ngày đã kết thúc để dữ liệu đủ. Ví dụ run mang logical date/ngày dữ liệu D không nhất thiết bắt đầu lúc đầu ngày D.</p>
+<p>Không dùng <code>datetime.now()</code> làm <code>start_date</code>. Task phải đọc <code>data_interval_start/end</code> hoặc parameter được truyền, không đoán theo giờ máy chạy; như vậy backfill mới đúng.</p>
+<h2 id="4-dag-toi-gian">4. DAG tối giản</h2>
+<p>Ví dụ theo cú pháp Airflow 3; Airflow 2 có import path khác:</p>
+<pre><code>from datetime import datetime, timedelta
+from airflow.sdk import dag, task
+
+@dag(
+    schedule=&quot;@daily&quot;,
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    max_active_runs=1,
+    tags=[&quot;sales&quot;],
+)
+def sales_daily():
+    @task(retries=2, retry_delay=timedelta(minutes=1))
+    def ingest():
+        return {&quot;manifest_path&quot;: &quot;/audit/run.json&quot;}
+
+    @task
+    def transform(metadata: dict):
+        print(metadata[&quot;manifest_path&quot;])
+
+    transform(ingest())
+
+sales_daily()</code></pre>
+<p>Import path có thể khác giữa các major version. Mục tiêu ví dụ là dependency và chỉ truyền metadata nhỏ.</p>
+<h2 id="5-idempotency-retry-va-timeout">5. Idempotency, retry và timeout</h2>
+<ul>
+<li>Task ghi vào partition/data interval xác định.</li>
+<li>Dùng staging + atomic publish/merge.</li>
+<li>Retry chỉ lỗi transient; giới hạn số lần và có backoff.</li>
+<li><code>execution_timeout</code> ngăn task treo vô hạn.</li>
+<li>API call có network timeout riêng.</li>
+<li>Ghi <code>run_id</code>, data interval và target trong log.</li>
+</ul>
+<p>Task <code>extract -&gt; transform -&gt; load</code> nên độc lập, rerun task nào cũng không phá kết quả đã đúng.</p>
+<h2 id="6-catchup-backfill-va-late-data">6. Catchup, backfill và late data</h2>
+<ul>
+<li><strong>catchup</strong>: scheduler tạo run cho các interval cũ chưa chạy.</li>
+<li><strong>backfill</strong>: chủ động chạy lại nhiều interval lịch sử.</li>
+<li>Hạn chế concurrency bằng pool/max active runs để không đánh sập source/sink.</li>
+<li>Backfill phải dùng cùng logic production nhưng ghi đúng interval.</li>
+<li>Late data có thể cần lookback/recompute window.</li>
+</ul>
+<p>Test backfill nhỏ trước; quan sát cost và downstream rate limit.</p>
+<h2 id="7-dynamic-task-mapping-va-taskgroup">7. Dynamic task mapping và TaskGroup</h2>
+<ul>
+<li>Dynamic mapping tạo task theo danh sách runtime, ví dụ danh sách bảng.</li>
+<li>TaskGroup giúp UI dễ đọc nhưng không phải isolation boundary.</li>
+<li>Tránh tạo hàng chục nghìn task nhỏ; orchestration overhead có thật.</li>
+<li>Không gọi API/database nặng ở top-level DAG vì Dag processor parse file thường xuyên.</li>
+</ul>
+<h2 id="8-van-hanh-production">8. Vận hành production</h2>
+<ul>
+<li>DAG code qua Git/CI, parse test và unit test.</li>
+<li>Secret ở secret backend, không trong DAG/Variable plaintext nếu tránh được.</li>
+<li>Alert failed task, missed deadline, zombie/heartbeat và queue delay.</li>
+<li>Log phải tập trung và truy cập được sau khi worker mất.</li>
+<li>Chọn executor/deployment theo workload, isolation và quy mô; không scale trước khi đo.</li>
+</ul>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Viết DAG <code>orders_daily</code>:</p>
+<ol>
+<li>Sensor đợi file hoàn chỉnh.</li>
+<li>Ingest Bronze theo <code>data_interval</code>.</li>
+<li>Chạy quality gate.</li>
+<li>Trigger Spark/dbt transformation.</li>
+<li>Refresh semantic/report sau khi Gold pass.</li>
+<li>Ghi audit và callback alert khi fail.</li>
+<li>Backfill 3 ngày và chứng minh không trùng.</li>
+</ol>
+<h2 id="10-checklist">10. Checklist</h2>
+<ul>
+<li><span class="check"></span>DAG import nhanh, không thực hiện I/O ở top level.</li>
+<li><span class="check"></span>Task nhỏ vừa đủ, retry/rerun an toàn.</li>
+<li><span class="check"></span>Dùng data interval, không dùng thời gian hiện tại để chọn dữ liệu.</li>
+<li><span class="check"></span>XCom chỉ chứa metadata nhỏ.</li>
+<li><span class="check"></span>Có pool/concurrency, timeout, alert và runbook.</li>
+</ul>
+<p>Tài liệu chính: <a href="https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/" target="_blank" rel="noreferrer">Airflow core concepts</a>, <a href="https://airflow.apache.org/docs/apache-airflow/stable/concepts/scheduler.html" target="_blank" rel="noreferrer">Airflow scheduler</a>.</p>
+<h2 id="11-data-interval-bang-timeline">11. Data interval bằng timeline</h2>
+<p>DAG <code>@daily</code> xử lý ngày 2026-09-21 có interval <code>[2026-09-21 00:00, 2026-09-22 00:00)</code>. Scheduler thường tạo run sau khi interval kết thúc. Task query:</p>
+<pre><code>WHERE event_time &gt;= :data_interval_start
+  AND event_time &lt;  :data_interval_end</code></pre>
+<p>Dùng khoảng half-open tránh overlap ở biên. Backfill ngày cũ vẫn lấy đúng interval; dùng <code>now()</code> sẽ lấy nhầm dữ liệu ngày chạy backfill.</p>
+<h2 id="12-operator-sensor-va-taskflow-chon-gi">12. Operator, Sensor và TaskFlow chọn gì?</h2>
+<ul>
+<li>Operator/provider có sẵn phù hợp khi chỉ cần cấu hình call đến service.</li>
+<li>TaskFlow thuận tiện viết Python task và dependency rõ.</li>
+<li>Sensor chờ condition; mode reschedule/deferrable giải phóng worker slot tốt hơn poke giữ slot lâu.</li>
+<li>Task chỉ trigger job external chưa đủ: cần sensor/deferrable wait và kiểm tra final state nếu downstream async.</li>
+</ul>
+<h2 id="13-trigger-rule-va-cleanup">13. Trigger rule và cleanup</h2>
+<p>Mặc định downstream chạy khi upstream success. Cleanup/audit có thể cần chạy dù upstream fail, nhưng trigger rule sai có thể biến DAG run thành success giả. Tách:</p>
+<ul>
+<li>Task nghiệp vụ bắt buộc.</li>
+<li>Task audit/notify luôn chạy.</li>
+<li>DAG status/quality gate phản ánh đúng outcome nghiệp vụ.</li>
+</ul>
+<h2 id="14-xcom-va-data-passing">14. XCom và data passing</h2>
+<p>XCom dành cho ID/path/count/small metadata. Pattern:</p>
+<pre><code>ingest returns {manifest_uri, batch_id, rows}
+transform reads data from manifest_uri/object storage</code></pre>
+<p>Không serialize DataFrame hoặc hàng MB dữ liệu vào metadata database. Data đi qua storage/warehouse; control metadata đi qua XCom.</p>
+<h2 id="15-dag-test-strategy">15. DAG test strategy</h2>
+<ul>
+<li>Import/parse test: không syntax/import error, DAG ID/task ID đúng.</li>
+<li>Unit test callable/business logic ngoài DAG.</li>
+<li>Structure test: dependency, schedule, retries, pool.</li>
+<li>Integration test provider/connection ở non-prod.</li>
+<li>Backfill test một vài interval, kể cả zero/late data.</li>
+</ul>
+<p>DAG file top-level phải parse nhanh và deterministic. Không query database/list cloud files lúc import.</p>
+<h2 id="16-failure-walkthrough">16. Failure walkthrough</h2>
+<p>Task transform fail sau khi ingest thành công:</p>
+<ol>
+<li>Airflow retry transform nếu lỗi transient; không tự rerun ingest nếu dependency không bị clear.</li>
+<li>Transform đọc manifest/output Bronze deterministic.</li>
+<li>Sau fix, clear đúng task instance và downstream cho interval.</li>
+<li>Quality gate + publish chạy lại idempotently.</li>
+<li>Audit ghi attempt và final result; không xóa dấu vết fail.</li>
+</ol>
+<h2 id="17-cau-hoi-co-ap-an">17. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Airflow có phải streaming engine?</strong> Không; nó orchestration batch/workflow, không xử lý event record liên tục.</li>
+<li><strong><code>catchup=False</code> có nghĩa không backfill được?</strong> Không; vẫn có thể trigger/backfill chủ động.</li>
+<li><strong>Vì sao task quá nhỏ có hại?</strong> Scheduler/metadata/log overhead tăng và DAG khó vận hành.</li>
+<li><strong>Retry ở Airflow có thay retry HTTP client?</strong> Không hoàn toàn; task retry chạy lại toàn task, network retry xử lý call transient nhỏ với deadline.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-13.html"><small>← Bài trước</small><b>Monitoring &amp; Operations on Azure</b></a><a class="next" href="unit-15.html"><small>Bài tiếp →</small><b>Data Governance &amp; Security</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 14 / 18</footer><script src="../assets/lesson.js"></script></body></html>

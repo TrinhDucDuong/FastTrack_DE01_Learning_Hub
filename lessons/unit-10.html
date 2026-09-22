@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 10: Data Storage Solutions on Azure"><title>DE01 · 10 · Data Storage Solutions on Azure</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="10"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 10 · Data Storage Solutions on Azure</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 10 / 18</div><h1>Data Storage Solutions on Azure</h1><p>Chọn storage theo access pattern, format, security, retention và recovery.</p><div class="lesson-meta"><span class="pill">ADLS Gen2</span><span class="pill">Parquet</span><span class="pill">Partition</span><span class="pill">Lifecycle</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-chon-storage-theo-access-pattern">1. Chọn storage theo access pattern</h2>
+<p>Đừng bắt đầu bằng tên dịch vụ. Hỏi trước:</p>
+<ul>
+<li>Dữ liệu là file/object, relational, key-value hay analytical table?</li>
+<li>Đọc/ghi theo record hay scan nhiều cột?</li>
+<li>Cần transaction, latency, concurrency, retention và recovery mức nào?</li>
+<li>Ai truy cập, qua mạng nào, dữ liệu nhạy cảm ra sao?</li>
+</ul>
+<h2 id="2-nhom-dich-vu-thuong-gap">2. Nhóm dịch vụ thường gặp</h2>
+<table><thead><tr><th>Nhu cầu</th><th>Lựa chọn điển hình</th></tr></thead><tbody><tr><td>Object/file data lake</td><td>Azure Blob Storage + ADLS Gen2 capability</td></tr><tr><td>Relational OLTP</td><td>Azure SQL Database / managed relational service</td></tr><tr><td>Key-value/document quy mô lớn</td><td>Azure Cosmos DB (khi access pattern phù hợp)</td></tr><tr><td>Analytics warehouse</td><td>Fabric Warehouse / Synapse / Databricks SQL hoặc warehouse được chọn</td></tr><tr><td>Message/event retention ngắn hạn</td><td>Event Hubs; không thay thế data lake lâu dài</td></tr></tbody></table>
+<p>Đây là điểm bắt đầu, không phải quy tắc tuyệt đối. Quyết định cần benchmark với workload thật.</p>
+<h2 id="3-adls-gen2">3. ADLS Gen2</h2>
+<p>ADLS Gen2 là các khả năng data lake trên Azure Blob Storage, nổi bật là <strong>hierarchical namespace</strong>. Nó cho cấu trúc directory, thao tác directory hiệu quả và ACL chi tiết, đồng thời vẫn tận dụng object storage.</p>
+<pre><code>container/
+  bronze/source_name/entity/ingestion_date=2026-09-22/
+  silver/domain/entity/event_date=2026-09-22/
+  gold/sales/fact_sales/order_date=2026-09-22/
+  quarantine/source_name/entity/</code></pre>
+<p>Phân tách container/folder phải cân bằng giữa security boundary, lifecycle và khả năng quản lý; không tạo quá nhiều account/container chỉ để mô phỏng folder.</p>
+<h2 id="4-file-format">4. File format</h2>
+<table><thead><tr><th>Format</th><th>Điểm mạnh</th><th>Lưu ý</th></tr></thead><tbody><tr><td>CSV</td><td>Dễ trao đổi, dễ nhìn</td><td>Không schema mạnh, parse chậm, kiểu dữ liệu mơ hồ</td></tr><tr><td>JSON</td><td>Linh hoạt, dữ liệu lồng nhau</td><td>Verbose, schema drift dễ xảy ra</td></tr><tr><td>Parquet</td><td>Columnar, nén và column pruning tốt</td><td>Không tiện sửa tay; cần quản lý schema</td></tr><tr><td>Delta/table format</td><td>Transaction log, update/merge/time travel tùy engine</td><td>Thêm metadata và phụ thuộc engine/ecosystem</td></tr></tbody></table>
+<p>Analytics thường ưu tiên Parquet/table format; raw có thể giữ nguyên bản nguồn để replay.</p>
+<h2 id="5-partitioning-va-small-file-problem">5. Partitioning và small-file problem</h2>
+<p>Partition theo cột thường xuyên lọc và có cardinality vừa phải, thường là ngày. Partition pruning chỉ giúp khi query filter đúng partition column.</p>
+<p>Tránh:</p>
+<ul>
+<li>Partition theo ID gần như unique.</li>
+<li>Hàng nghìn file vài KB/MB do mỗi task ghi một file.</li>
+<li>Folder không nhất quán hoặc nhúng timezone mơ hồ.</li>
+</ul>
+<p>Giải pháp: compact file, điều chỉnh số partition khi ghi, theo dõi file count/average size và chuẩn hóa path.</p>
+<h2 id="6-security">6. Security</h2>
+<ul>
+<li><strong>RBAC</strong>: quyền theo scope Azure.</li>
+<li><strong>ACL</strong>: quyền directory/file trong hierarchical namespace.</li>
+<li>Managed identity/Entra ID thay shared key nếu có thể.</li>
+<li>Private endpoint và firewall để giảm public exposure.</li>
+<li>Encryption at rest được Azure Storage hỗ trợ; cân nhắc customer-managed key theo yêu cầu.</li>
+<li>Không đưa PII vào tên file/path/log.</li>
+</ul>
+<p>RBAC và ACL có thể cùng ảnh hưởng đến quyền; debug authorization cần biết principal, scope và đường dẫn cụ thể.</p>
+<h2 id="7-redundancy-tier-va-lifecycle">7. Redundancy, tier và lifecycle</h2>
+<ul>
+<li>Chọn redundancy theo RPO/RTO và yêu cầu vùng; nhiều bản sao không thay thế backup/versioning.</li>
+<li>Hot/Cool/Cold/Archive phù hợp tần suất truy cập khác nhau; phí đọc lại và thời gian rehydrate có thể đáng kể.</li>
+<li>Lifecycle policy chuyển tier/xóa dữ liệu theo retention đã duyệt.</li>
+<li>Bật versioning/soft delete khi phù hợp, và thực hành restore.</li>
+</ul>
+<p><strong>RPO</strong>: chấp nhận mất tối đa bao nhiêu dữ liệu. <strong>RTO</strong>: cần phục hồi trong bao lâu.</p>
+<h2 id="8-auditability-va-idempotency">8. Auditability và idempotency</h2>
+<p>Mỗi batch nên có manifest hoặc metadata: source, file, checksum, expected count, received time, <code>run_id</code>, trạng thái. Chỉ đọc file khi đã hoàn chỉnh (complete marker/atomic publish pattern).</p>
+<p>Bronze immutable giúp replay; rerun cần kiểm soát append/overwrite/merge để không tạo trùng.</p>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Thiết kế storage cho orders, customers và product images:</p>
+<ul>
+<li>Chọn service và format cho từng loại.</li>
+<li>Vẽ folder/partition cho 90 ngày.</li>
+<li>Chọn quyền cho ingestion, transform và BI identity.</li>
+<li>Đề xuất lifecycle sau 30 ngày/1 năm.</li>
+<li>Mô tả cách phát hiện file thiếu, file dở dang và duplicate batch.</li>
+</ul>
+<h2 id="10-checklist">10. Checklist</h2>
+<ul>
+<li><span class="check"></span>Storage được chọn theo access pattern.</li>
+<li><span class="check"></span>Path, schema và partition convention được ghi rõ.</li>
+<li><span class="check"></span>Có retention, lifecycle, recovery và restore test.</li>
+<li><span class="check"></span>Có encryption, private access và least privilege.</li>
+<li><span class="check"></span>Theo dõi small files, dung lượng và chi phí transaction.</li>
+</ul>
+<p>Tài liệu chính: <a href="https://learn.microsoft.com/azure/storage/blobs/data-lake-storage-introduction" target="_blank" rel="noreferrer">Azure Data Lake Storage overview</a>.</p>
+<h2 id="11-object-storage-khong-phai-local-filesystem">11. Object storage không phải local filesystem</h2>
+<p>Object có key/path logic; rename/list directory có semantics/cost khác filesystem truyền thống. Hierarchical namespace giúp directory operations hiệu quả hơn nhưng vẫn cần thiết kế tránh listing hàng triệu object không phân vùng.</p>
+<p>Không dùng file existence đơn lẻ làm transaction phức tạp. Pattern phổ biến: writer ghi vào staging/temp path, validate, sau đó publish manifest/complete marker để reader chỉ đọc batch hoàn chỉnh.</p>
+<h2 id="12-parquet-ben-trong-co-gi">12. Parquet bên trong có gì?</h2>
+<p>Parquet lưu dữ liệu theo row group và column chunk, kèm metadata/statistics. Engine có thể:</p>
+<ul>
+<li>Column pruning: chỉ đọc cột query cần.</li>
+<li>Predicate pushdown/row-group skipping: bỏ vùng chắc chắn không khớp filter.</li>
+<li>Nén/encoding theo kiểu và giá trị gần nhau.</li>
+</ul>
+<p>File quá nhỏ làm metadata overhead; file quá lớn giảm parallelism và làm retry nặng. Target size phụ thuộc engine/workload, cần đo thay vì áp dụng một con số tuyệt đối.</p>
+<h2 id="13-folder-va-partition-design-bang-query-pattern">13. Folder và partition design bằng query pattern</h2>
+<p>Nếu phần lớn query lọc theo <code>order_date</code>:</p>
+<pre><code>silver/orders/order_date=2026-09-22/part-....parquet</code></pre>
+<p>Không thêm <code>customer_id</code> thành partition chỉ vì hay xuất hiện trong WHERE nếu cardinality hàng triệu. Statistics/clustering/index ở engine khác với directory partition; chọn đúng công cụ.</p>
+<h2 id="14-rbac-va-acl-mental-model">14. RBAC và ACL mental model</h2>
+<ul>
+<li>RBAC gán role ở subscription/resource group/account/container tùy action.</li>
+<li>ACL trên ADLS path có access ACL và default ACL kế thừa cho item mới.</li>
+<li>Execute (<code>x</code>) trên directory cần để traverse path.</li>
+</ul>
+<p>Khi 403, ghi lại principal object ID, token audience, requested operation, account/container/path và role/ACL effective. Đừng cấp Owner để &quot;thử&quot; trên production.</p>
+<h2 id="15-recovery-scenario">15. Recovery scenario</h2>
+<p>Tình huống: transform sai ghi đè Gold ngày 20–22/09.</p>
+<ol>
+<li>Dừng downstream publish/refresh.</li>
+<li>Xác định code release và affected partitions.</li>
+<li>Khôi phục table version/snapshot hoặc recompute từ Silver/Bronze.</li>
+<li>Chạy quality/reconciliation.</li>
+<li>Publish atomic, refresh cache/BI.</li>
+<li>Ghi incident và thêm regression test.</li>
+</ol>
+<p>Versioning/time travel có retention giới hạn; phải thử restore trước khi incident.</p>
+<h2 id="16-storage-cost-thinking">16. Storage cost thinking</h2>
+<p>Tổng cost không chỉ là GB/tháng: transaction/list, retrieval từ cool/archive, early deletion, replication, network egress và compute scan dữ liệu. Nén/columnar giảm cả storage và bytes processed nhưng lifecycle sai có thể làm backfill rất chậm/đắt.</p>
+<h2 id="17-cau-hoi-co-ap-an">17. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Vì sao CSV kém cho schema evolution?</strong> Type/nullable không được lưu mạnh; parsing phụ thuộc delimiter/locale/header.</li>
+<li><strong>Partition pruning xảy ra khi nào?</strong> Query filter cột/path partition theo cách engine nhận diện được.</li>
+<li><strong>Soft delete có phải backup?</strong> Không; nó giúp recovery ngắn hạn, không thay chiến lược backup/DR.</li>
+<li><strong>Vì sao Bronze immutable?</strong> Tăng audit/replay và tách lỗi transform khỏi dữ liệu nguồn đã nhận.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-09.html"><small>← Bài trước</small><b>Azure Fundamentals &amp; Core Infrastructure</b></a><a class="next" href="unit-11.html"><small>Bài tiếp →</small><b>Batch Data Processing on Azure</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 10 / 18</footer><script src="../assets/lesson.js"></script></body></html>

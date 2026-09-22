@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 4: API Development with FastAPI"><title>DE01 · 04 · API Development with FastAPI</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="4"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 04 · API Development with FastAPI</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 04 / 18</div><h1>API Development with FastAPI</h1><p>Thiết kế contract rõ, retry an toàn và lỗi mà cả máy lẫn người đọc được.</p><div class="lesson-meta"><span class="pill">API</span><span class="pill">FastAPI</span><span class="pill">Idempotency</span><span class="pill">Security</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="core-api-design">Thiết kế API cốt lõi</h2>
+<h2 id="1-muc-tieu">1. Mục tiêu</h2>
+<p>Thiết kế REST API có contract rõ, validation, authentication/authorization, idempotency, pagination, error model, timeout, test và observability.</p>
+<h2 id="2-request-lifecycle">2. Request lifecycle</h2>
+<pre><code>Client -&gt; middleware -&gt; authentication -&gt; validation -&gt; route
+       -&gt; service/business rule -&gt; repository/downstream
+       -&gt; response serialization -&gt; middleware/log/metrics</code></pre>
+<p>Route nên mỏng: nhận transport data, gọi service và map kết quả/lỗi. Business rule không nên nằm rải trong router.</p>
+<h2 id="3-resource-va-http-method">3. Resource và HTTP method</h2>
+<ul>
+<li><code>GET /products/{id}</code>: đọc, safe và idempotent.</li>
+<li><code>POST /orders</code>: tạo resource; có thể cần idempotency key.</li>
+<li><code>PUT /users/me</code>: thay toàn bộ representation theo contract.</li>
+<li><code>PATCH /orders/{id}/status</code>: sửa một phần/transition.</li>
+<li><code>DELETE</code>: nên định nghĩa rõ hard delete, soft delete hay deactivate.</li>
+</ul>
+<p>Status thường dùng: 200, 201 + <code>Location</code>, 204, 400, 401, 403, 404, 409, 422, 429, 500/502/503. Không dùng 200 cho mọi lỗi.</p>
+<h2 id="4-pydantic-schema-va-boundary-validation">4. Pydantic schema và boundary validation</h2>
+<pre><code>from decimal import Decimal
+from pydantic import BaseModel, Field
+
+class OrderItemCreate(BaseModel):
+    product_id: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=100)
+
+class OrderCreate(BaseModel):
+    items: list[OrderItemCreate] = Field(min_length=1, max_length=50)
+    coupon_code: str | None = Field(default=None, max_length=40)
+
+class OrderRead(BaseModel):
+    id: int
+    status: str
+    total_amount: Decimal</code></pre>
+<p>Schema validation kiểm tra shape/type/range. Rule &quot;coupon thuộc user và còn hạn&quot; là business validation trong service với dữ liệu database.</p>
+<h2 id="5-dependency-injection-va-lifecycle">5. Dependency injection và lifecycle</h2>
+<pre><code>from fastapi import APIRouter, Depends, status
+
+router = APIRouter(prefix=&quot;/api/v1/orders&quot;, tags=[&quot;orders&quot;])
+
+@router.post(&quot;&quot;, response_model=OrderRead, status_code=status.HTTP_201_CREATED)
+def create_order(payload: OrderCreate, service=Depends(get_order_service)):
+    return service.create(payload)</code></pre>
+<p>Database pool/HTTP client nên mở ở application lifespan và đóng khi shutdown. Dependency theo request có thể cấp session/transaction nhưng không tạo engine mới mỗi lần.</p>
+<h2 id="6-error-contract">6. Error contract</h2>
+<pre><code>{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;INSUFFICIENT_STOCK&quot;,
+    &quot;message&quot;: &quot;One or more products are out of stock.&quot;,
+    &quot;details&quot;: [{&quot;product_id&quot;: 42, &quot;available&quot;: 1}],
+    &quot;correlation_id&quot;: &quot;req_01...&quot;
+  }
+}</code></pre>
+<p><code>code</code> ổn định cho client; message dễ hiểu; details không lộ SQL/stack/secret. Map domain exception tập trung bằng exception handler.</p>
+<h2 id="7-idempotency-cho-checkout-payment">7. Idempotency cho checkout/payment</h2>
+<p>Client gửi <code>Idempotency-Key</code>. Server lưu key + request fingerprint + kết quả trong transaction phù hợp:</p>
+<ol>
+<li>Key mới: xử lý và lưu response.</li>
+<li>Key cũ + cùng payload: trả lại kết quả cũ.</li>
+<li>Key cũ + payload khác: trả conflict.</li>
+<li>Hai request đồng thời: unique constraint/lock đảm bảo chỉ một request thắng.</li>
+</ol>
+<p>Key có TTL và scope theo user/endpoint. Chỉ thêm header mà không có storage/atomicity chưa tạo idempotency.</p>
+<h2 id="8-pagination-va-filter">8. Pagination và filter</h2>
+<p>Offset pagination dễ làm nhưng chậm/không ổn định ở offset lớn khi data thay đổi. Cursor/keyset pagination dùng sort key ổn định:</p>
+<pre><code>WHERE (created_at, id) &lt; (:cursor_created_at, :cursor_id)
+ORDER BY created_at DESC, id DESC
+LIMIT :limit</code></pre>
+<p>Giới hạn <code>limit</code>, whitelist sort/filter field và luôn có tie-breaker unique.</p>
+<h2 id="9-authentication-va-authorization">9. Authentication và authorization</h2>
+<ul>
+<li>Authentication xác định identity; authorization kiểm tra action/resource.</li>
+<li>401: chưa/xác thực không hợp lệ; 403: đã xác thực nhưng không có quyền.</li>
+<li>Không tin <code>user_id</code> từ payload nếu đã có identity trong token/session.</li>
+<li>Admin route cần policy/role rõ và audit thay đổi nhạy cảm.</li>
+<li>CORS không phải authentication; nó là browser policy.</li>
+</ul>
+<h2 id="10-timeout-retry-va-rate-limit">10. Timeout, retry và rate limit</h2>
+<p>API gọi downstream phải có timeout nhỏ hơn timeout toàn request. Retry chỉ transient error, có backoff/jitter và tôn trọng deadline. Rate limit bảo vệ tài nguyên nhưng cần trả 429 và <code>Retry-After</code> khi phù hợp.</p>
+<p>Payload size limit, request body streaming và batch max size ngăn một request chiếm hết memory.</p>
+<h2 id="11-test-strategy">11. Test strategy</h2>
+<ul>
+<li>Unit test service với fake repository.</li>
+<li>API test status/schema/header/error.</li>
+<li>Integration test database transaction/constraint.</li>
+<li>Contract test downstream.</li>
+<li>Security test: missing token, role sai, object-level access.</li>
+<li>Idempotency/concurrency test: hai request cùng key.</li>
+</ul>
+<h2 id="12-observability">12. Observability</h2>
+<p>Log method, route template, status, latency, correlation ID và caller/client class; không dùng raw URL nếu chứa PII. Metrics: request rate, error rate, latency percentile, saturation và downstream dependency.</p>
+<h2 id="13-mini-lab">13. Mini lab</h2>
+<p>Xây <code>POST /api/v1/orders</code> và <code>GET /api/v1/orders</code>:</p>
+<ol>
+<li>Schema và business validation tách biệt.</li>
+<li>Transaction tạo order/items.</li>
+<li>Idempotency key cho create.</li>
+<li>Cursor pagination cho list.</li>
+<li>Error contract thống nhất.</li>
+<li>Test duplicate request, out-of-stock và unauthorized access.</li>
+</ol>
+<h2 id="14-cau-hoi-co-ap-an">14. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Validation pass có nghĩa business hợp lệ không?</strong> Không; schema đúng chưa chứng minh stock/coupon/ownership đúng.</li>
+<li><strong>Vì sao retry POST nguy hiểm?</strong> Có thể tạo side effect trùng nếu không idempotent.</li>
+<li><strong>CORS có bảo vệ API khỏi curl không?</strong> Không; curl không bị browser CORS policy.</li>
+<li><strong>Vì sao log route template thay raw path?</strong> Tránh cardinality cao và lộ ID/PII.</li>
+</ol>
+<h2 id="api-inventory">API inventory cho project</h2>
+<h2 id="1-auth-user">1. Auth &amp; User</h2>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/auth/register</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/auth/login</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/auth/refresh</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/auth/logout</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/users/profile</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/users/profile</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/users/addresses</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/users/addresses/{address_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/users/addresses</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/users/addresses/{address_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/users/addresses/{address_id}</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/users</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/users/{user_id}</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/users/{user_id}/status</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/users/{user_id}/role</span></div>
+<h2 id="2-catalogs">2. Catalogs</h2>
+<p>Categories</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/categories</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/categories/tree</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/categories/{category_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/admin/categories</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/admin/categories/{category_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/admin/categories/{category_id}</span></div>
+<p>Products</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/products</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/products/{product_id}</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/products/search</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/products/sku/{sku}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/admin/products</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/admin/products/{product_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/admin/products/{product_id}</span></div>
+<p>Inventory</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/products/{product_id}/inventory</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/admin/products/{product_id}/inventory</span></div>
+<p>Flash Sale</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/flash-sales</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/flash-sales/{flash_sale_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/admin/flash-sales</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/admin/flash-sales/{flash_sale_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/admin/flash-sales/{flash_sale_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/admin/flash-sales/{flash_sale_id}/products</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/admin/flash-sales/{flash_sale_id}/products/{product_id}</span></div>
+<h2 id="3-coupons">3.Coupons</h2>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/coupons/{code}/validate</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/admin/coupons</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/coupons</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/coupons/{coupon_id}</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/admin/coupons/{coupon_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/admin/coupons/{coupon_id}</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/coupons/{coupon_id}/activate</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/coupons/{coupon_id}/deactivate</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/coupons/{coupon_id}/usage</span></div>
+<h2 id="4-orders">4.Orders</h2>
+<p>Cart</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/cart</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/cart/items</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/cart/items/{item_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/cart/items/{item_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/cart/apply-coupon</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/cart/coupon</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/cart/summary</span></div>
+<p>Checkout</p>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/orders/checkout</span></div>
+<p>Orders</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/orders</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/orders/{order_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/orders</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/orders/{order_id}/cancel</span></div>
+<p>Admin Orders Management</p>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/orders</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/orders/{order_id}</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/orders/{order_id}/status</span></div>
+<p>Payments</p>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/payments/create</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/payments/{payment_id}</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/payments/webhook</span></div>
+<p>Idempotent Retry</p>
+<h2 id="5-reviews">5. Reviews</h2>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/products/{product_id}/reviews</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/products/{product_id}/reviews</span></div>
+<div class="endpoint"><span class="method">PUT</span><span>/api/v1/reviews/{review_id}</span></div>
+<div class="endpoint"><span class="method">DELETE</span><span>/api/v1/reviews/{review_id}</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/users/me/reviews</span></div>
+<h1 id="admin-moderation">Admin Moderation</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reviews</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/reviews/{review_id}/approve</span></div>
+<div class="endpoint"><span class="method">PATCH</span><span>/api/v1/admin/reviews/{review_id}/reject</span></div>
+<h1 id="rating-summary">Rating Summary</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/products/{product_id}/rating-summary</span></div>
+<h2 id="6-reports">6. REPORTS</h2>
+<h1 id="revenue">Revenue</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/revenue</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/revenue/daily</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/revenue/monthly</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/revenue/yearly</span></div>
+<h1 id="orders">Orders</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/orders</span></div>
+<h1 id="best-sellers">Best Sellers</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/top-products</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/top-products?limit=10</span></div>
+<h1 id="inventory">Inventory</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/low-stock</span></div>
+<h1 id="coupons">Coupons</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/coupon-usage</span></div>
+<h1 id="customers">Customers</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/reports/top-customers</span></div>
+<h1 id="dashboard">Dashboard</h1>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/admin/dashboard</span></div>
+<h1 id="">==========================================</h1>
+<h1 id="optional-advanced-apis">OPTIONAL ADVANCED APIs</h1>
+<h1 id="">==========================================</h1>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/batch/products/import</span></div>
+<div class="endpoint"><span class="method">POST</span><span>/api/v1/batch/orders/import</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/export/orders</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/export/products</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/health</span></div>
+<div class="endpoint"><span class="method">GET</span><span>/api/v1/version</span></div></main></div>
+<nav class="lesson-nav"><a href="unit-03.html"><small>← Bài trước</small><b>Relational Databases &amp; Advanced SQL</b></a><a class="next" href="unit-05.html"><small>Bài tiếp →</small><b>Data Modeling &amp; Warehousing Concepts</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 04 / 18</footer><script src="../assets/lesson.js"></script></body></html>

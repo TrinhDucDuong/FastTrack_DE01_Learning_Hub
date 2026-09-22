@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 9: Azure Fundamentals &amp; Core Infrastructure"><title>DE01 · 09 · Azure Fundamentals &amp; Core Infrastructure</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="9"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 09 · Azure Fundamentals &amp; Core Infrastructure</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 09 / 18</div><h1>Azure Fundamentals &amp; Core Infrastructure</h1><p>Tổ chức resource, identity, network, governance và chi phí cloud.</p><div class="lesson-meta"><span class="pill">Azure</span><span class="pill">Entra ID</span><span class="pill">RBAC</span><span class="pill">VNet</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-muc-tieu">1. Mục tiêu</h2>
+<p>Hiểu cách Azure tổ chức tài nguyên, danh tính, mạng, chi phí và chọn building block cho một data platform cơ bản.</p>
+<h2 id="2-cau-truc-quan-ly-tai-nguyen">2. Cấu trúc quản lý tài nguyên</h2>
+<pre><code>Microsoft Entra tenant
+  -&gt; Management Group (tùy quy mô)
+    -&gt; Subscription
+      -&gt; Resource Group
+        -&gt; Resource</code></pre>
+<ul>
+<li><strong>Tenant</strong>: ranh giới danh tính của tổ chức.</li>
+<li><strong>Subscription</strong>: ranh giới billing/quota/quản trị.</li>
+<li><strong>Resource group</strong>: nhóm tài nguyên có vòng đời hoặc mục đích liên quan; một resource chỉ thuộc một resource group tại một thời điểm.</li>
+<li><strong>Region</strong>: khu vực địa lý triển khai dịch vụ.</li>
+<li><strong>Availability Zone</strong>: các nhóm datacenter tách biệt trong một region; hỗ trợ chịu lỗi tùy dịch vụ/region.</li>
+</ul>
+<p>Không xem resource group như folder tùy ý. Nên nhóm theo môi trường và workload, ví dụ <code>rg-ecom-data-dev-sea</code>.</p>
+<h2 id="3-shared-responsibility">3. Shared responsibility</h2>
+<p>Azure bảo vệ datacenter, phần cứng và lớp cloud thuộc trách nhiệm của họ. Khách hàng vẫn chịu trách nhiệm về dữ liệu, identity, quyền truy cập, cấu hình mạng, secret và workload. Dịch vụ càng managed thì phần vận hành hạ tầng của khách hàng càng ít, nhưng trách nhiệm bảo vệ dữ liệu không biến mất.</p>
+<h2 id="4-identity-va-authorization">4. Identity và authorization</h2>
+<ul>
+<li><strong>Microsoft Entra ID</strong>: hệ thống identity.</li>
+<li><strong>Authentication</strong>: bạn là ai?</li>
+<li><strong>Authorization</strong>: bạn được phép làm gì?</li>
+<li><strong>Azure RBAC</strong>: gán role cho principal tại scope phù hợp.</li>
+<li><strong>Managed identity</strong>: danh tính cho Azure resource; ưu tiên hơn lưu account key/password trong code.</li>
+</ul>
+<p>Nguyên tắc <strong>least privilege</strong>: cấp quyền tối thiểu, ở scope nhỏ nhất, trong thời gian cần thiết. Phân biệt control plane (quản lý resource) với data plane (đọc/ghi data).</p>
+<h2 id="5-networking-co-ban">5. Networking cơ bản</h2>
+<ul>
+<li><strong>VNet/subnet</strong>: mạng riêng logic và phân đoạn tài nguyên.</li>
+<li><strong>NSG</strong>: rule allow/deny traffic ở network layer.</li>
+<li><strong>Private endpoint</strong>: đưa endpoint của dịch vụ PaaS vào VNet qua private IP.</li>
+<li><strong>Public network access/firewall</strong>: hạn chế nguồn được truy cập.</li>
+<li><strong>DNS</strong>: private endpoint chỉ hoạt động đúng khi name resolution đúng.</li>
+</ul>
+<p>Khi pipeline timeout, ngoài code phải kiểm tra route, firewall, private endpoint, DNS và credential hết hạn.</p>
+<h2 id="6-governance-va-resource-hygiene">6. Governance và resource hygiene</h2>
+<ul>
+<li>Naming convention nhất quán: workload, loại resource, env, region.</li>
+<li>Tag tối thiểu: <code>environment</code>, <code>owner</code>, <code>cost_center</code>, <code>data_classification</code>.</li>
+<li>Azure Policy để audit/deny cấu hình không chuẩn.</li>
+<li>Resource lock cho tài nguyên quan trọng, nhưng phải có quy trình thay đổi rõ.</li>
+<li>Infrastructure as Code để môi trường lặp lại được và review qua Git.</li>
+</ul>
+<h2 id="7-cost-mental-model">7. Cost mental model</h2>
+<p>Chi phí thường đến từ:</p>
+<ul>
+<li>Compute chạy bao lâu và kích thước bao nhiêu.</li>
+<li>Storage capacity, tier, transaction/list operation.</li>
+<li>Data transfer/egress giữa region hoặc ra internet.</li>
+<li>Số lần pipeline/activity chạy và integration runtime.</li>
+<li>Log volume và thời gian retention.</li>
+</ul>
+<p>Đặt budget/alert, tag để quy chi phí, auto-stop/auto-pause compute khi có thể. Không tối ưu bằng cách tắt monitoring cần thiết.</p>
+<h2 id="8-data-platform-toi-gian-tren-azure">8. Data platform tối giản trên Azure</h2>
+<pre><code>Sources
+  -&gt; Azure Data Factory (orchestrate/copy)
+  -&gt; Azure Data Lake Storage Gen2 (Bronze/Silver/Gold)
+  -&gt; Databricks/Spark hoặc SQL engine (transform)
+  -&gt; Warehouse/semantic model/Power BI (serve)
+
+Cross-cutting: Entra ID, Key Vault, VNet/Private Endpoint,
+Azure Monitor/Log Analytics, IaC, CI/CD</code></pre>
+<p>Tên sản phẩm không quan trọng bằng vai trò: ingest, store, process, serve, secure, observe.</p>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Vẽ kiến trúc e-commerce dev:</p>
+<ol>
+<li>Một resource group và storage account.</li>
+<li>ADF copy batch từ source vào Bronze.</li>
+<li>Compute transform Bronze → Silver → Gold.</li>
+<li>Managed identity đọc/ghi đúng container.</li>
+<li>Private networking và log destination.</li>
+<li>Tag, budget và cách dọn resource thử nghiệm.</li>
+</ol>
+<h2 id="10-checklist">10. Checklist</h2>
+<ul>
+<li><span class="check"></span>Biết resource nằm ở tenant/subscription/resource group nào.</li>
+<li><span class="check"></span>Không hard-code secret; ưu tiên managed identity.</li>
+<li><span class="check"></span>Quyền được cấp theo least privilege.</li>
+<li><span class="check"></span>Có tagging, budget và owner.</li>
+<li><span class="check"></span>Kiến trúc có cả security, monitoring và recovery.</li>
+</ul>
+<p>Tài liệu học tiếp: <a href="https://learn.microsoft.com/training/azure/" target="_blank" rel="noreferrer">Azure fundamentals</a>, <a href="https://learn.microsoft.com/azure/architecture/" target="_blank" rel="noreferrer">Azure Architecture Center</a>.</p>
+<h2 id="11-region-zone-va-high-availability">11. Region, zone và high availability</h2>
+<p>Chọn region theo data residency, service availability, latency và cost. Multi-zone giúp chịu lỗi datacenter trong region nếu dịch vụ hỗ trợ; multi-region xử lý region outage nhưng phức tạp và đắt hơn.</p>
+<p>High availability không đồng nghĩa disaster recovery:</p>
+<ul>
+<li>HA giảm downtime khi component lỗi.</li>
+<li>Backup/versioning giúp khôi phục corruption/deletion.</li>
+<li>DR quy định failover sang nơi khác theo RPO/RTO.</li>
+</ul>
+<p>Mỗi dịch vụ trong pipeline có guarantee khác nhau; kiến trúc tổng thể chỉ mạnh bằng dependency yếu và runbook chưa test.</p>
+<h2 id="12-identity-flow-mau">12. Identity flow mẫu</h2>
+<pre><code>ADF managed identity
+  -&gt; RBAC/ACL đọc landing/incoming
+  -&gt; RBAC/ACL ghi bronze
+
+Spark managed identity
+  -&gt; đọc bronze
+  -&gt; ghi silver/gold
+
+BI identity
+  -&gt; chỉ đọc warehouse/gold đã publish</code></pre>
+<p>Không cấp cùng một identity quyền đọc raw PII, ghi Gold và quản trị resource. Tách identity theo workload/môi trường để giảm blast radius và audit rõ.</p>
+<h2 id="13-network-path-e-troubleshooting">13. Network path để troubleshooting</h2>
+<p>Khi kết nối PaaS qua private endpoint:</p>
+<ol>
+<li>Tên host phải resolve về private IP.</li>
+<li>Route/NSG/firewall phải cho traffic cần thiết.</li>
+<li>Dịch vụ nguồn/sink phải cho subnet/private endpoint.</li>
+<li>Identity vẫn cần authorization data plane.</li>
+</ol>
+<p>Timeout thường gợi ý network/path; 401/403 gợi ý identity/token/quyền; nhưng phải đọc error/log thay vì đoán.</p>
+<h2 id="14-naming-va-tagging-co-muc-ich">14. Naming và tagging có mục đích</h2>
+<p>Ví dụ <code>stde01prodsea01</code> có thể theo constraint storage account; tên khác như <code>rg-de01-prod-sea</code>. Naming convention cần bảng viết tắt, environment, region, workload và uniqueness rule.</p>
+<p>Tag phục vụ owner/cost/automation nhưng không phải security boundary. Policy có thể yêu cầu tag hoặc deny public network, sai region, thiếu diagnostic settings.</p>
+<h2 id="15-infrastructure-as-code-lifecycle">15. Infrastructure as Code lifecycle</h2>
+<pre><code>code change -&gt; validate/lint -&gt; plan/what-if -&gt; review
+-&gt; deploy non-prod -&gt; verify -&gt; approval -&gt; prod</code></pre>
+<p>Không sửa portal thủ công rồi quên cập nhật IaC vì tạo configuration drift. Secret không nằm trong state/output công khai; state backend phải được bảo vệ và lock.</p>
+<h2 id="16-worked-architecture-decision">16. Worked architecture decision</h2>
+<p>Yêu cầu: e-commerce daily analytics, nguồn SQL on-prem, dữ liệu nhạy cảm, team nhỏ.</p>
+<ul>
+<li>ADF + self-hosted IR để đi vào on-prem network.</li>
+<li>ADLS Gen2 làm Bronze/Silver/Gold.</li>
+<li>Spark/Databricks cho transform lớn; dbt/SQL cho mart.</li>
+<li>Managed identity + Key Vault, private endpoints theo threat model.</li>
+<li>Azure Monitor/Log Analytics cho telemetry.</li>
+<li>Một region ban đầu, backup/versioning và DR plan theo RPO/RTO.</li>
+</ul>
+<p>Ghi decision record: context, options, decision, trade-off và điều kiện xem xét lại.</p>
+<h2 id="17-cau-hoi-co-ap-an">17. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Resource group có phải security boundary tuyệt đối?</strong> Không; nó là management scope, quyền vẫn do RBAC/resource policy/data plane.</li>
+<li><strong>Managed identity có nghĩa không cần phân quyền?</strong> Không; identity vẫn cần role tối thiểu.</li>
+<li><strong>Private endpoint có tự sửa DNS không?</strong> Cần cấu hình/resolution đúng, nhất là hybrid network.</li>
+<li><strong>Tag có chặn user đọc dữ liệu không?</strong> Không; dùng RBAC/ACL/policy phù hợp.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-08.html"><small>← Bài trước</small><b>Data Transformation with dbt</b></a><a class="next" href="unit-10.html"><small>Bài tiếp →</small><b>Data Storage Solutions on Azure</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 09 / 18</footer><script src="../assets/lesson.js"></script></body></html>

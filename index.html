@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Trang tổng hợp kiến thức Data Engineering DE01 từ Git đến Capstone.">
+  <title>FastTrack DE01 Learning Hub</title>
+  <style>
+    :root {
+      --ink: #14213d;
+      --muted: #5c667d;
+      --paper: #f5f1e8;
+      --surface: #fffdf8;
+      --line: #d9d4c7;
+      --brand: #005f73;
+      --brand-2: #0a9396;
+      --accent: #e76f51;
+      --gold: #ee9b00;
+      --success: #2a9d6f;
+      --code: #102a43;
+      --shadow: 0 12px 32px rgba(20, 33, 61, .09);
+      --radius: 18px;
+    }
+
+    [data-theme="dark"] {
+      --ink: #edf2f4;
+      --muted: #adb6c8;
+      --paper: #0b1624;
+      --surface: #122235;
+      --line: #2c4056;
+      --brand: #65c3ba;
+      --brand-2: #94d2bd;
+      --accent: #f28b70;
+      --gold: #ffb703;
+      --success: #63d2a1;
+      --code: #08131f;
+      --shadow: 0 14px 36px rgba(0, 0, 0, .28);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 8%, color-mix(in srgb, var(--gold) 15%, transparent), transparent 25rem),
+        radial-gradient(circle at 92% 22%, color-mix(in srgb, var(--brand-2) 15%, transparent), transparent 28rem),
+        var(--paper);
+      font: 16px/1.65 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    a { color: var(--brand); }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 99; background: var(--surface); padding: .7rem 1rem; }
+    .skip-link:focus { top: 1rem; }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; gap: 1rem;
+      min-height: 68px; padding: .7rem clamp(1rem, 4vw, 4rem);
+      color: white; background: rgba(0, 63, 76, .96);
+      border-bottom: 1px solid rgba(255,255,255,.17);
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: .7rem; min-width: max-content; font-weight: 800; letter-spacing: .04em; }
+    .brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border: 2px solid #ffd166; border-radius: 10px; color: #ffd166; }
+    .search { position: relative; flex: 1; max-width: 680px; margin-inline: auto; }
+    .search input { width: 100%; padding: .7rem 1rem .7rem 2.5rem; color: white; background: rgba(255,255,255,.11); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; outline: none; }
+    .search input::placeholder { color: rgba(255,255,255,.72); }
+    .search input:focus { border-color: #ffd166; box-shadow: 0 0 0 3px rgba(255,209,102,.18); }
+    .search::before { content: "⌕"; position: absolute; left: .9rem; top: .3rem; font-size: 1.35rem; }
+    .toolbar { display: flex; gap: .45rem; }
+    .icon-btn { min-width: 40px; height: 40px; padding: 0 .75rem; color: white; background: transparent; border: 1px solid rgba(255,255,255,.25); border-radius: 10px; }
+    .icon-btn:hover { background: rgba(255,255,255,.12); }
+
+    .hero { max-width: 1320px; margin: 0 auto; padding: clamp(3.5rem, 8vw, 7rem) clamp(1rem, 4vw, 4rem) 3rem; }
+    .eyebrow { color: var(--accent); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }
+    h1 { max-width: 900px; margin: .45rem 0 1rem; font-size: clamp(2.7rem, 7vw, 6.5rem); line-height: .96; letter-spacing: -.055em; }
+    .hero-copy { max-width: 760px; color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.28rem); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+    .button { display: inline-flex; align-items: center; gap: .5rem; padding: .75rem 1rem; text-decoration: none; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 5px 16px rgba(20,33,61,.06); }
+    .button.primary { background: var(--brand); color: var(--paper); border-color: var(--brand); }
+    .button:hover { transform: translateY(-1px); }
+
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 3rem; }
+    .stat { padding: 1.2rem; border-top: 3px solid var(--brand-2); background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: var(--shadow); border-radius: 0 0 var(--radius) var(--radius); }
+    .stat strong { display: block; font-size: 2rem; line-height: 1; }
+    .stat span { color: var(--muted); font-size: .88rem; }
+    .progress-track { height: 8px; margin-top: .75rem; background: var(--line); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--gold), var(--accent)); transition: width .25s; }
+
+    .roadmap-wrap { max-width: 1320px; margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 4rem) 3rem; }
+    .section-kicker { margin: 0 0 .3rem; color: var(--accent); font-weight: 800; font-size: .78rem; letter-spacing: .13em; text-transform: uppercase; }
+    h2 { margin: 0 0 .7rem; font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1.08; letter-spacing: -.035em; }
+    .lead { max-width: 760px; margin-top: 0; color: var(--muted); }
+    .roadmap { display: grid; grid-template-columns: repeat(6, 1fr); gap: .65rem; margin-top: 1.5rem; }
+    .stage { position: relative; min-height: 148px; padding: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+    .stage::after { content: "→"; position: absolute; right: -.62rem; top: 50%; z-index: 2; color: var(--accent); font-size: 1.15rem; font-weight: 900; }
+    .stage:last-child::after { content: none; }
+    .stage b { display: block; margin-bottom: .5rem; color: var(--brand); }
+    .stage small { color: var(--muted); }
+    .stage-num { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-bottom: .75rem; background: color-mix(in srgb, var(--gold) 20%, transparent); color: var(--ink); border-radius: 50%; font-weight: 800; font-size: .78rem; }
+
+    .layout { display: grid; grid-template-columns: 255px minmax(0, 1fr); gap: 2rem; max-width: 1320px; margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 4rem) 5rem; }
+    aside { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 110px); overflow: auto; padding-right: .4rem; }
+    .nav-title { margin: 0 0 .65rem; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .unit-nav { display: grid; gap: .28rem; }
+    .unit-nav a { display: grid; grid-template-columns: 28px 1fr; gap: .5rem; align-items: center; padding: .45rem .55rem; color: var(--muted); text-decoration: none; border-radius: 9px; font-size: .84rem; line-height: 1.25; }
+    .unit-nav a:hover, .unit-nav a.active { color: var(--ink); background: var(--surface); }
+    .unit-nav .n { display: grid; place-items: center; width: 26px; height: 26px; color: var(--brand); border: 1px solid var(--line); border-radius: 8px; font-weight: 800; font-size: .72rem; }
+    .unit-nav a.done .n { color: white; background: var(--success); border-color: var(--success); }
+
+    main { min-width: 0; }
+    .module { scroll-margin-top: 88px; margin: 0 0 1rem; padding: clamp(1.1rem, 3vw, 2rem); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 26px rgba(20,33,61,.055); }
+    .module[hidden] { display: none; }
+    .module-head { display: grid; grid-template-columns: 56px minmax(0,1fr) auto; gap: 1rem; align-items: start; }
+    .unit-badge { display: grid; place-items: center; width: 54px; height: 54px; background: var(--ink); color: var(--paper); border-radius: 16px; font-weight: 900; font-size: 1.05rem; }
+    .module h3 { margin: 0; font-size: clamp(1.25rem, 3vw, 1.75rem); line-height: 1.15; }
+    .module-summary { margin: .35rem 0 0; color: var(--muted); }
+    .complete { padding: .5rem .7rem; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 10px; white-space: nowrap; }
+    .complete:hover { color: var(--success); border-color: var(--success); }
+    .module.completed { border-color: color-mix(in srgb, var(--success) 60%, var(--line)); }
+    .module.completed .complete { color: white; background: var(--success); border-color: var(--success); }
+    .tag-row { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0; }
+    .tag { padding: .18rem .55rem; border-radius: 999px; color: var(--brand); background: color-mix(in srgb, var(--brand-2) 12%, transparent); font-size: .76rem; font-weight: 750; }
+    .learning-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-top: 1rem; }
+    .learning-block { padding: .9rem; background: color-mix(in srgb, var(--paper) 60%, transparent); border-radius: 12px; }
+    .learning-block b { display: block; margin-bottom: .3rem; font-size: .84rem; color: var(--accent); }
+    .learning-block p, .learning-block ul { margin: 0; color: var(--muted); font-size: .91rem; }
+    .learning-block ul { padding-left: 1.1rem; }
+    .module-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .7rem; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+    .note-link { font-size: .87rem; font-weight: 750; text-decoration: none; }
+    .question { color: var(--muted); font-size: .87rem; font-style: italic; }
+
+    .visual { margin: 2rem 0; padding: clamp(1rem, 3vw, 2rem); background: var(--code); color: #edf6f9; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .visual h2 { color: white; }
+    .visual .lead { color: #b9cad8; }
+    .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.1rem; margin-top: 1.5rem; }
+    .pipe-step { position: relative; padding: 1.1rem .8rem; text-align: center; border: 1px solid #36536d; border-radius: 14px; background: #15354e; }
+    .pipe-step::after { content: "→"; position: absolute; right: -.82rem; top: 34%; color: #ffd166; font-size: 1.35rem; }
+    .pipe-step:last-child::after { content: none; }
+    .pipe-step span { display: block; color: #8ecae6; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
+    .pipe-step strong { display: block; margin: .2rem 0; color: white; }
+    .pipe-step small { color: #b9cad8; }
+    .cross-cutting { margin-top: 1rem; padding: .75rem; text-align: center; border: 1px dashed #52718d; border-radius: 12px; color: #c8dae7; }
+
+    .compare { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: .9rem; }
+    .compare th, .compare td { padding: .75rem; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .compare th { color: var(--brand); }
+    .compare tr:last-child td { border-bottom: 0; }
+
+    .schema { display: grid; grid-template: "date fact customer" auto "product fact store" auto / 1fr 1.15fr 1fr; gap: .7rem; max-width: 730px; margin: 1.3rem auto 0; }
+    .schema-box { padding: .75rem; border: 1px solid #52718d; border-radius: 12px; background: #15354e; text-align: center; }
+    .schema-box.fact { grid-area: fact; align-self: center; border-color: #ffd166; color: #ffd166; }
+    .schema-box.date { grid-area: date; } .schema-box.customer { grid-area: customer; }
+    .schema-box.product { grid-area: product; } .schema-box.store { grid-area: store; }
+    .schema-box small { display: block; color: #9db4c6; }
+
+    .incident { display: grid; grid-template-columns: repeat(6, 1fr); gap: .5rem; margin-top: 1.2rem; }
+    .incident div { padding: .75rem .5rem; text-align: center; background: color-mix(in srgb, var(--surface) 80%, transparent); border: 1px solid var(--line); border-radius: 10px; font-size: .83rem; }
+    .incident b { display: block; color: var(--accent); }
+
+    .capstone { margin: 2rem 0; padding: clamp(1.3rem, 4vw, 2.5rem); background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 75%, #14213d)); color: white; border-radius: var(--radius); }
+    .capstone h2 { color: white; }
+    .capstone .lead { color: #cbe4e2; }
+    .milestones { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-top: 1.2rem; counter-reset: step; }
+    .milestone { padding: 1rem; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.2); border-radius: 12px; }
+    .milestone::before { counter-increment: step; content: counter(step, decimal-leading-zero); display: block; color: #ffd166; font-weight: 900; }
+
+    .empty { display: none; padding: 2rem; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); }
+    .empty.show { display: block; }
+    footer { padding: 2.5rem 1rem 4rem; text-align: center; color: var(--muted); }
+    kbd { padding: .15rem .4rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--surface); font-size: .78rem; }
+
+    @media (max-width: 1050px) {
+      .roadmap { grid-template-columns: repeat(3, 1fr); }
+      .stage:nth-child(3)::after { content: none; }
+      .layout { grid-template-columns: 1fr; }
+      aside { display: none; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .learning-grid { grid-template-columns: 1fr; }
+      .pipeline { grid-template-columns: 1fr; }
+      .pipe-step::after { content: "↓"; right: 49%; top: auto; bottom: -1.22rem; }
+      .milestones { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 650px) {
+      .topbar { flex-wrap: wrap; }
+      .brand { flex: 1; }
+      .search { order: 3; min-width: 100%; }
+      .toolbar .print { display: none; }
+      .roadmap { grid-template-columns: 1fr; }
+      .stage::after, .stage:nth-child(3)::after { content: "↓"; right: 49%; top: auto; bottom: -.95rem; }
+      .stage:last-child::after { content: none; }
+      .module-head { grid-template-columns: 46px 1fr; }
+      .unit-badge { width: 44px; height: 44px; border-radius: 12px; }
+      .complete { grid-column: 1 / -1; width: 100%; }
+      .stats, .milestones { grid-template-columns: 1fr; }
+      .schema { grid-template: "fact" "date" "customer" "product" "store" / 1fr; }
+      .incident { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media print {
+      .topbar, aside, .complete, .hero-actions { display: none !important; }
+      body { background: white; color: #111; }
+      .hero, .roadmap-wrap, .layout { max-width: none; padding: 1rem; }
+      .layout { display: block; }
+      .module, .visual, .capstone { break-inside: avoid; box-shadow: none; }
+      .module { border-color: #aaa; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Bỏ qua điều hướng</a>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">DE</span><span>FastTrack DE01 Learning Hub</span></div>
+    <label class="search"><input id="search" type="search" placeholder="Tìm: watermark, SCD, Spark, Airflow..." aria-label="Tìm trong khóa học"></label>
+    <div class="toolbar">
+      <button class="icon-btn print" id="print" title="In hoặc lưu PDF">In</button>
+      <button class="icon-btn" id="theme" title="Đổi giao diện" aria-label="Đổi giao diện">◐</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <p class="eyebrow">Data Engineering · Foundation</p>
+    <h1>Từ dữ liệu thô đến quyết định đáng tin.</h1>
+    <p class="hero-copy">Bản đồ học tập 18 buổi: nền tảng phần mềm, data warehouse, xử lý phân tán, Azure, vận hành production và một capstone end-to-end.</p>
+    <div class="hero-actions">
+      <a class="button primary" href="#unit-1">Bắt đầu học →</a>
+      <a class="button" href="lessons/unit-01.html">Mở bài học chi tiết đầu tiên</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><strong>18</strong><span>Unit từ nền tảng đến capstone</span></div>
+      <div class="stat"><strong>6</strong><span>Chặng kiến thức liên kết</span></div>
+      <div class="stat"><strong>1</strong><span>Case study e-commerce xuyên suốt</span></div>
+      <div class="stat"><strong id="progressText">0/18</strong><span>Tiến độ trên thiết bị này</span><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
+    </div>
+  </section>
+
+  <section class="roadmap-wrap" aria-labelledby="roadmap-title">
+    <p class="section-kicker">Learning roadmap</p>
+    <h2 id="roadmap-title">Sáu chặng, một dòng tư duy</h2>
+    <p class="lead">Mỗi chặng trả lời một câu hỏi khác nhau, nhưng tất cả gặp nhau ở mục tiêu: dữ liệu đúng, tìm được nguồn gốc, vận hành được và phục hồi được.</p>
+    <div class="roadmap">
+      <div class="stage"><span class="stage-num">01</span><b>Build</b><small>Git · Python · SQL · API<br>Viết phần mềm tạo và trao đổi dữ liệu.</small></div>
+      <div class="stage"><span class="stage-num">02</span><b>Model</b><small>DWH · Star schema<br>Biến giao dịch thành ngữ cảnh phân tích.</small></div>
+      <div class="stage"><span class="stage-num">03</span><b>Transform</b><small>Python DE · Spark · dbt<br>Xử lý dữ liệu có thể kiểm thử.</small></div>
+      <div class="stage"><span class="stage-num">04</span><b>Run on cloud</b><small>Azure · Storage · Batch · Stream<br>Chạy pipeline theo quy mô.</small></div>
+      <div class="stage"><span class="stage-num">05</span><b>Operate</b><small>Monitor · Airflow · Governance · CI/CD<br>Giữ hệ thống đáng tin.</small></div>
+      <div class="stage"><span class="stage-num">06</span><b>Prove</b><small>Capstone · Report · Q&amp;A<br>Chứng minh bằng hệ thống chạy thật.</small></div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside aria-label="Điều hướng unit">
+      <p class="nav-title">18 units</p>
+      <nav class="unit-nav" id="unitNav"></nav>
+    </aside>
+
+    <main id="content">
+      <section class="visual" aria-labelledby="pipeline-title">
+        <p class="section-kicker">End-to-end mental model</p>
+        <h2 id="pipeline-title">Một pipeline, năm vùng trách nhiệm</h2>
+        <p class="lead">Khi số liệu sai, lần theo tuyến này bằng row count, control total, freshness và cùng một run ID.</p>
+        <div class="pipeline">
+          <div class="pipe-step"><span>01 · Source</span><strong>OLTP · API · Files</strong><small>Contract, CDC, ownership</small></div>
+          <div class="pipe-step"><span>02 · Ingest</span><strong>Batch · Stream</strong><small>Retry, offset, manifest</small></div>
+          <div class="pipe-step"><span>03 · Lakehouse</span><strong>Bronze → Silver</strong><small>Replay, clean, conform</small></div>
+          <div class="pipe-step"><span>04 · Warehouse</span><strong>Gold · Star schema</strong><small>Grain, SCD, KPI</small></div>
+          <div class="pipe-step"><span>05 · Serve</span><strong>BI · API · ML</strong><small>Freshness, RLS, trust</small></div>
+        </div>
+        <div class="cross-cutting">Xuyên suốt: Security · Governance · Observability · Idempotency · CI/CD · Cost</div>
+      </section>
+
+      <div id="modules">
+        <article class="module" id="unit-1" data-title="Version Control with Git" data-tags="git branch commit merge rebase pull request secret version control">
+          <div class="module-head"><span class="unit-badge">01</span><div><h3>Version Control with Git</h3><p class="module-summary">Quản lý thay đổi như các snapshot có thể review, truy vết và phục hồi.</p></div><button class="complete" data-unit="1">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">commit</span><span class="tag">branch</span><span class="tag">PR</span><span class="tag">rebase</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Mental model</b><p>Working tree → staging → local commit → remote. Branch là con trỏ, HEAD là vị trí hiện tại.</p></div><div class="learning-block"><b>Phải làm được</b><p>Tạo branch, chia commit nhỏ, resolve conflict, mở PR có test và impact.</p></div><div class="learning-block"><b>Bẫy thường gặp</b><p>Commit secret/data lớn; force push branch chung; add tất cả mà không xem diff.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-01.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: revert khác reset như thế nào?</span></div>
+        </article>
+
+        <article class="module" id="unit-2" data-title="Python for Application Development" data-tags="python application function class exception virtual environment async testing config">
+          <div class="module-head"><span class="unit-badge">02</span><div><h3>Python for Application Development</h3><p class="module-summary">Viết ứng dụng module hóa, quản lý dependency, lỗi và resource đúng cách.</p></div><button class="complete" data-unit="2">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">venv</span><span class="tag">exceptions</span><span class="tag">typing</span><span class="tag">tests</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Thiết kế</b><p>Tách transport, service và repository; dependency được truyền vào để dễ test.</p></div><div class="learning-block"><b>Độ tin cậy</b><p>Context manager, timeout, exception có nghĩa, config theo môi trường.</p></div><div class="learning-block"><b>Bẫy</b><p>Hard-code secret; bắt mọi exception; dùng async cho CPU-bound hoặc gọi blocking trong event loop.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-02.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: layer nào nên bắt lỗi database?</span></div>
+        </article>
+
+        <article class="module" id="unit-3" data-title="Relational Databases and Advanced SQL" data-tags="sql database oltp acid normalization index window function transaction lock">
+          <div class="module-head"><span class="unit-badge">03</span><div><h3>Relational Databases &amp; Advanced SQL</h3><p class="module-summary">Hiểu transaction, index và cách database thực thi truy vấn.</p></div><button class="complete" data-unit="3">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">ACID</span><span class="tag">B-tree</span><span class="tag">window</span><span class="tag">locking</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Nền tảng</b><p>OLTP, normalization, ACID và isolation bảo vệ tính đúng của giao dịch.</p></div><div class="learning-block"><b>Hiệu năng</b><p>Disk I/O là bottleneck; index giảm dữ liệu cần đọc nhưng làm write tốn thêm.</p></div><div class="learning-block"><b>SQL nâng cao</b><p>Execution order, window function, query plan và concurrency control.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-03.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: index nào có selectivity tốt nhất?</span></div>
+        </article>
+
+        <article class="module" id="unit-4" data-title="API Development with FastAPI" data-tags="api fastapi endpoint rest idempotency pagination authentication error timeout">
+          <div class="module-head"><span class="unit-badge">04</span><div><h3>API Development with FastAPI</h3><p class="module-summary">Thiết kế contract rõ, retry an toàn và lỗi mà cả máy lẫn người đọc được.</p></div><button class="complete" data-unit="4">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">REST</span><span class="tag">validation</span><span class="tag">idempotency</span><span class="tag">auth</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Contract</b><p>Resource, method, schema, status code, pagination và versioning nhất quán.</p></div><div class="learning-block"><b>Reliability</b><p>Idempotency key, timeout, bounded retry và partial failure trong batch.</p></div><div class="learning-block"><b>Quan sát</b><p>Correlation ID, structured log, core metrics; sanitize payload nhạy cảm.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-04.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: POST checkout retry hai lần sẽ ra sao?</span></div>
+        </article>
+
+        <article class="module" id="unit-5" data-title="Data Modeling and Warehousing" data-tags="data warehouse olap fact dimension grain star schema scd medallion bronze silver gold">
+          <div class="module-head"><span class="unit-badge">05</span><div><h3>Data Modeling &amp; Warehousing</h3><p class="module-summary">Chuyển transaction thành mô hình phân tích có grain và lịch sử rõ ràng.</p></div><button class="complete" data-unit="5">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">fact/dim</span><span class="tag">grain</span><span class="tag">SCD2</span><span class="tag">Medallion</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Quy tắc vàng</b><p>Chốt business process và grain trước khi chọn dimension, measure và key.</p></div><div class="learning-block"><b>Lịch sử</b><p>SCD Type 1 ghi đè; Type 2 thêm phiên bản với khoảng hiệu lực.</p></div><div class="learning-block"><b>Điều tra KPI</b><p>Đối soát Source → Bronze → Silver → Gold → semantic model.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-05.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: một dòng fact_sales đại diện điều gì?</span></div>
+        </article>
+
+        <section class="visual" aria-labelledby="schema-title">
+          <p class="section-kicker">Modeling visual</p><h2 id="schema-title">Star schema: fact ở giữa, ngữ cảnh bao quanh</h2>
+          <div class="schema"><div class="schema-box date"><b>dim_date</b><small>ngày · tuần · tháng</small></div><div class="schema-box customer"><b>dim_customer</b><small>segment · region · SCD</small></div><div class="schema-box fact"><b>fact_sales</b><small>1 row / order item<br>qty · revenue · discount</small></div><div class="schema-box product"><b>dim_product</b><small>SKU · category · brand</small></div><div class="schema-box store"><b>dim_store</b><small>store · city · channel</small></div></div>
+        </section>
+
+        <article class="module" id="unit-6" data-title="Python for Data Engineering" data-tags="python data engineering chunk generator watermark retry idempotency logging quarantine">
+          <div class="module-head"><span class="unit-badge">06</span><div><h3>Python for Data Engineering</h3><p class="module-summary">Pipeline không chỉ chạy được: phải tiết kiệm bộ nhớ, rerun và audit được.</p></div><button class="complete" data-unit="6">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">chunks</span><span class="tag">generator</span><span class="tag">watermark</span><span class="tag">audit</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Luồng chuẩn</b><p>Extract → validate → transform → load → audit; lỗi data đi quarantine.</p></div><div class="learning-block"><b>Incremental</b><p>Lookback + deduplicate; chỉ advance watermark sau target commit.</p></div><div class="learning-block"><b>Quality</b><p>Đếm rows in/out/rejected, duration, retry và freshness.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-06.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: rerun cùng file có nhân đôi không?</span></div>
+        </article>
+
+        <article class="module" id="unit-7" data-title="Spark and PySpark" data-tags="spark pyspark driver executor partition shuffle skew dataframe lazy evaluation distributed">
+          <div class="module-head"><span class="unit-badge">07</span><div><h3>Distributed Processing with Spark</h3><p class="module-summary">Chia dữ liệu thành partition và hiểu chi phí của shuffle, skew và small files.</p></div><button class="complete" data-unit="7">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">partition</span><span class="tag">lazy</span><span class="tag">shuffle</span><span class="tag">skew</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Runtime</b><p>Driver lập plan; executors chạy task; action kích hoạt job và stage.</p></div><div class="learning-block"><b>Optimize</b><p>Filter/select sớm, broadcast bảng nhỏ, ưu tiên built-in thay Python UDF.</p></div><div class="learning-block"><b>Debug</b><p>Đọc explain plan và Spark UI trước khi tăng cluster.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-07.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: wide transformation gây chi phí gì?</span></div>
+        </article>
+
+        <article class="module" id="unit-8" data-title="Data Transformation with dbt" data-tags="dbt model ref source test snapshot incremental materialization lineage sql">
+          <div class="module-head"><span class="unit-badge">08</span><div><h3>Data Transformation with dbt</h3><p class="module-summary">Đưa transformation SQL vào DAG, Git, test và documentation.</p></div><button class="complete" data-unit="8">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">ref/source</span><span class="tag">models</span><span class="tag">tests</span><span class="tag">incremental</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Structure</b><p>Staging chuẩn hóa → intermediate tái sử dụng → marts fact/dimension.</p></div><div class="learning-block"><b>Materialize</b><p>View, table, incremental, ephemeral theo access pattern và cost.</p></div><div class="learning-block"><b>Trust</b><p>Test key, relationship, rule nghiệp vụ; docs và lineage cho consumer.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-08.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: ref() tạo giá trị gì ngoài tên bảng?</span></div>
+        </article>
+
+        <article class="module" id="unit-9" data-title="Azure Fundamentals and Infrastructure" data-tags="azure cloud subscription resource group entra rbac vnet managed identity cost">
+          <div class="module-head"><span class="unit-badge">09</span><div><h3>Azure Fundamentals &amp; Infrastructure</h3><p class="module-summary">Tổ chức resource, identity, network và chi phí cho data platform.</p></div><button class="complete" data-unit="9">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">Entra ID</span><span class="tag">RBAC</span><span class="tag">VNet</span><span class="tag">IaC</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Hierarchy</b><p>Tenant → management group → subscription → resource group → resource.</p></div><div class="learning-block"><b>Security</b><p>Managed identity, least privilege, private endpoint và đúng DNS.</p></div><div class="learning-block"><b>Cost</b><p>Compute time, storage, transactions, egress, pipeline run và log volume.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-09.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: control plane khác data plane ở đâu?</span></div>
+        </article>
+
+        <article class="module" id="unit-10" data-title="Azure Data Storage" data-tags="azure storage adls gen2 blob parquet delta partition lifecycle acl rbac">
+          <div class="module-head"><span class="unit-badge">10</span><div><h3>Data Storage Solutions on Azure</h3><p class="module-summary">Chọn storage theo access pattern, security, retention và recovery.</p></div><button class="complete" data-unit="10">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">ADLS Gen2</span><span class="tag">Parquet</span><span class="tag">partition</span><span class="tag">lifecycle</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Format</b><p>CSV/JSON dễ trao đổi; Parquet tối ưu analytics; table format thêm transaction metadata.</p></div><div class="learning-block"><b>Layout</b><p>Partition theo cột lọc thường xuyên, cardinality vừa; compact small files.</p></div><div class="learning-block"><b>Control</b><p>RBAC + ACL, encryption, private access, tier/lifecycle và restore test.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-10.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: backup khác redundancy thế nào?</span></div>
+        </article>
+
+        <article class="module" id="unit-11" data-title="Batch Processing on Azure" data-tags="azure data factory adf batch pipeline activity dataset linked service integration runtime watermark cdc">
+          <div class="module-head"><span class="unit-badge">11</span><div><h3>Batch Data Processing on Azure</h3><p class="module-summary">Orchestrate dữ liệu hữu hạn theo lịch/sự kiện với watermark và backfill an toàn.</p></div><button class="complete" data-unit="11">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">ADF</span><span class="tag">incremental</span><span class="tag">CDC</span><span class="tag">backfill</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>ADF model</b><p>Pipeline, activity, dataset, linked service, integration runtime và trigger.</p></div><div class="learning-block"><b>Watermark</b><p>Chốt upper bound, load + validate, rồi mới commit tiến độ.</p></div><div class="learning-block"><b>Failure</b><p>Manifest, run ID, staging, quarantine và data quality gates.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-11.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: partial failure được replay ra sao?</span></div>
+        </article>
+
+        <article class="module" id="unit-12" data-title="Real-time Streaming on Azure" data-tags="streaming event hubs partition consumer group offset late data watermark structured streaming checkpoint">
+          <div class="module-head"><span class="unit-badge">12</span><div><h3>Real-time Data Streaming</h3><p class="module-summary">Xử lý event liên tục với partition, checkpoint và semantics rõ ràng.</p></div><button class="complete" data-unit="12">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">Event Hubs</span><span class="tag">offset</span><span class="tag">late event</span><span class="tag">checkpoint</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Ordering</b><p>Chỉ đảm bảo trong một partition; partition key quyết định ordering và skew.</p></div><div class="learning-block"><b>Time</b><p>Phân biệt event time/processing time; watermark cân bằng late data và state.</p></div><div class="learning-block"><b>Recovery</b><p>Durable checkpoint, raw capture, dedup key và idempotent sink.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-12.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: exactly-once effect đến từ đâu?</span></div>
+        </article>
+
+        <article class="module" id="unit-13" data-title="Monitoring and Operations" data-tags="monitoring observability logs metrics traces alerts slo incident runbook kql azure monitor">
+          <div class="module-head"><span class="unit-badge">13</span><div><h3>Monitoring &amp; Operations</h3><p class="module-summary">Nhìn thấy cả system health lẫn data correctness và phản ứng có quy trình.</p></div><button class="complete" data-unit="13">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">logs/metrics</span><span class="tag">SLI/SLO</span><span class="tag">alerts</span><span class="tag">runbook</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Signals</b><p>Availability, latency, throughput, error, saturation, correctness và cost.</p></div><div class="learning-block"><b>Data health</b><p>Freshness, volume, schema, duplicate, null và control total.</p></div><div class="learning-block"><b>Alert</b><p>Actionable: impact, severity, owner, log query, runbook; tránh alert storm.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-13.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: job xanh nhưng zero rows có khỏe không?</span></div>
+        </article>
+
+        <section aria-labelledby="incident-title" style="margin:2rem 0">
+          <p class="section-kicker">Operations visual</p><h2 id="incident-title">Vòng đời một incident dữ liệu</h2>
+          <div class="incident"><div><b>01</b>Detect</div><div><b>02</b>Triage</div><div><b>03</b>Contain</div><div><b>04</b>Recover</div><div><b>05</b>Verify</div><div><b>06</b>Learn</div></div>
+        </section>
+
+        <article class="module" id="unit-14" data-title="Advanced Orchestration with Airflow" data-tags="airflow dag task scheduler executor data interval retry xcom sensor backfill">
+          <div class="module-head"><span class="unit-badge">14</span><div><h3>Advanced Orchestration with Airflow</h3><p class="module-summary">Biến dependency, lịch, retry và backfill thành workflow-as-code.</p></div><button class="complete" data-unit="14">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">DAG</span><span class="tag">data interval</span><span class="tag">XCom</span><span class="tag">backfill</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Scheduling</b><p>DAG run chịu trách nhiệm một data interval; không chọn data bằng now().</p></div><div class="learning-block"><b>Task design</b><p>Idempotent, bounded retry/timeout; XCom chỉ truyền metadata nhỏ.</p></div><div class="learning-block"><b>Scale</b><p>Pool/concurrency bảo vệ downstream; deferrable sensor khi chờ lâu.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-14.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: daily run vì sao xuất hiện sau interval?</span></div>
+        </article>
+
+        <article class="module" id="unit-15" data-title="Data Governance and Security" data-tags="governance security catalog lineage pii rbac acl encryption retention data contract">
+          <div class="module-head"><span class="unit-badge">15</span><div><h3>Data Governance &amp; Security</h3><p class="module-summary">Dữ liệu có owner, ý nghĩa, lineage, quyền và vòng đời rõ ràng.</p></div><button class="complete" data-unit="15">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">catalog</span><span class="tag">lineage</span><span class="tag">PII</span><span class="tag">least privilege</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Ownership</b><p>Owner duyệt business; steward duy trì metadata/quality; custodian vận hành.</p></div><div class="learning-block"><b>Access</b><p>Managed identity, RBAC/ACL, masking, review và audit.</p></div><div class="learning-block"><b>Lifecycle</b><p>Contract, classification, retention và deletion xuyên raw/derived/backup.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-15.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: ai là owner KPI doanh thu?</span></div>
+        </article>
+
+        <article class="module" id="unit-16" data-title="DataOps and CI CD" data-tags="dataops ci cd git test deploy migration rollback artifact blue green canary">
+          <div class="module-head"><span class="unit-badge">16</span><div><h3>DataOps &amp; CI/CD</h3><p class="module-summary">Tự động hóa kiểm tra, promotion và recovery cho cả code lẫn data.</p></div><button class="complete" data-unit="16">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">CI/CD</span><span class="tag">artifact</span><span class="tag">migration</span><span class="tag">rollback</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>CI</b><p>Lint → unit → compile → contract → integration → data/idempotency test.</p></div><div class="learning-block"><b>CD</b><p>Build một artifact rồi promote dev → staging → production.</p></div><div class="learning-block"><b>Data-aware</b><p>Rollback code không tự rollback dữ liệu; cần restore/recompute/verify.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-16.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: expand-contract giảm rủi ro gì?</span></div>
+        </article>
+
+        <article class="module" id="unit-17" data-title="Capstone End-to-End Analytics Pipeline" data-tags="capstone project architecture ingestion bronze silver gold dashboard quality demo">
+          <div class="module-head"><span class="unit-badge">17</span><div><h3>Capstone: End-to-End Analytics</h3><p class="module-summary">Gom mọi mảnh thành một lát cắt nhỏ nhưng chạy, test và demo được.</p></div><button class="complete" data-unit="17">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">MVP</span><span class="tag">reliability</span><span class="tag">evidence</span><span class="tag">demo</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Scope</b><p>Orders/items/customers/products; batch daily; một fact và dimensions.</p></div><div class="learning-block"><b>Proof</b><p>Rerun không trùng, quality gate, alert, failure drill và reconciliation.</p></div><div class="learning-block"><b>Principle</b><p>Một critical path chạy ổn tốt hơn sơ đồ có nhiều dịch vụ nhưng chưa tích hợp.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-17.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: demo nào chứng minh reliability rõ nhất?</span></div>
+        </article>
+
+        <article class="module" id="unit-18" data-title="Final Review Report and Q&A" data-tags="review report q&a evidence presentation interview final architecture tradeoff">
+          <div class="module-head"><span class="unit-badge">18</span><div><h3>Final Review, Report &amp; Q&amp;A</h3><p class="module-summary">Kể câu chuyện kỹ thuật bằng context, quyết định, trade-off và evidence.</p></div><button class="complete" data-unit="18">○ Chưa học</button></div>
+          <div class="tag-row"><span class="tag">report</span><span class="tag">evidence</span><span class="tag">trade-off</span><span class="tag">Q&amp;A</span></div>
+          <div class="learning-grid"><div class="learning-block"><b>Report</b><p>Problem → architecture → data design → operations → security → result.</p></div><div class="learning-block"><b>Evidence</b><p>Run result, test, reconciliation, dashboard freshness, alert và cost.</p></div><div class="learning-block"><b>Answer</b><p>Context → decision → trade-off → evidence → next step; không overclaim.</p></div></div>
+          <div class="module-foot"><a class="note-link" href="lessons/unit-18.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: limitation lớn nhất của project là gì?</span></div>
+        </article>
+      </div>
+
+      <section class="capstone" aria-labelledby="capstone-title">
+        <p class="section-kicker" style="color:#ffd166">Build order</p>
+        <h2 id="capstone-title">Lộ trình capstone theo lát cắt</h2>
+        <p class="lead">Hoàn thành một đường đi end-to-end trước, rồi mới mở rộng chiều ngang.</p>
+        <div class="milestones"><div class="milestone">Chốt câu hỏi business và grain</div><div class="milestone">Source → Bronze có audit</div><div class="milestone">Silver có clean + quarantine</div><div class="milestone">Gold có fact/dim + KPI</div><div class="milestone">Orchestrate một data interval</div><div class="milestone">Rerun/backfill không trùng</div><div class="milestone">Monitor + alert + runbook</div><div class="milestone">CI/CD + report + demo</div></div>
+      </section>
+
+      <section aria-labelledby="compare-title" style="margin:2.5rem 0">
+        <p class="section-kicker">Quick comparison</p><h2 id="compare-title">Những cặp dễ nhầm</h2>
+        <table class="compare"><thead><tr><th>Khái niệm</th><th>Khác biệt cần nhớ</th></tr></thead><tbody>
+          <tr><td>OLTP vs OLAP</td><td>Giao dịch nhỏ/latency thấp vs scan và aggregate dữ liệu lớn.</td></tr>
+          <tr><td>Batch vs Streaming</td><td>Tập dữ liệu hữu hạn theo interval vs event liên tục; chọn theo SLA thực tế.</td></tr>
+          <tr><td>Retry vs Replay</td><td>Thử lại thao tác transient vs xử lý lại dữ liệu lịch sử từ nguồn/raw.</td></tr>
+          <tr><td>Backup vs Redundancy</td><td>Khôi phục phiên bản/trạng thái vs duy trì khả dụng khi hạ tầng lỗi.</td></tr>
+          <tr><td>Monitoring vs Observability</td><td>Biết có vấn đề vs đủ tín hiệu để giải thích nguyên nhân.</td></tr>
+          <tr><td>Rollback code vs data</td><td>Đổi artifact về bản cũ không tự đảo các record đã ghi.</td></tr>
+        </tbody></table>
+      </section>
+
+      <div class="empty" id="empty">Không tìm thấy nội dung phù hợp. Thử một từ khóa khác.</div>
+    </main>
+  </div>
+
+  <footer>
+    <p><b>FastTrack DE01 Learning Hub</b> · Lộ trình tự học Data Engineering từ nền tảng đến capstone.</p>
+    <p>Tìm nhanh bằng <kbd>Ctrl</kbd> + <kbd>K</kbd> · Tiến độ và giao diện được lưu trên trình duyệt.</p>
+  </footer>
+
+  <script>
+    (function () {
+      const modules = Array.from(document.querySelectorAll('.module'));
+      const nav = document.getElementById('unitNav');
+      const search = document.getElementById('search');
+      const empty = document.getElementById('empty');
+      const progressText = document.getElementById('progressText');
+      const progressFill = document.getElementById('progressFill');
+      const saved = new Set(JSON.parse(localStorage.getItem('de01-progress') || '[]'));
+
+      modules.forEach(function (module) {
+        const unit = module.id.replace('unit-', '');
+        const title = module.dataset.title;
+        const link = document.createElement('a');
+        link.href = '#' + module.id;
+        link.innerHTML = '<span class="n">' + unit.padStart(2, '0') + '</span><span>' + title + '</span>';
+        link.dataset.unit = unit;
+        nav.appendChild(link);
+        if (saved.has(unit)) setCompleted(module, true);
+      });
+
+      function setCompleted(module, done) {
+        const unit = module.id.replace('unit-', '');
+        const button = module.querySelector('.complete');
+        const navLink = nav.querySelector('[data-unit="' + unit + '"]');
+        module.classList.toggle('completed', done);
+        if (navLink) navLink.classList.toggle('done', done);
+        button.textContent = done ? '✓ Đã học' : '○ Chưa học';
+        button.setAttribute('aria-pressed', String(done));
+      }
+
+      function updateProgress() {
+        progressText.textContent = saved.size + '/18';
+        progressFill.style.width = ((saved.size / 18) * 100) + '%';
+        localStorage.setItem('de01-progress', JSON.stringify(Array.from(saved)));
+      }
+
+      document.addEventListener('click', function (event) {
+        const button = event.target.closest('.complete');
+        if (!button) return;
+        const unit = button.dataset.unit;
+        const module = document.getElementById('unit-' + unit);
+        if (saved.has(unit)) saved.delete(unit); else saved.add(unit);
+        setCompleted(module, saved.has(unit));
+        updateProgress();
+      });
+
+      search.addEventListener('input', function () {
+        const query = search.value.trim().toLocaleLowerCase('vi');
+        let visible = 0;
+        modules.forEach(function (module) {
+          const haystack = (module.dataset.title + ' ' + module.dataset.tags + ' ' + module.textContent).toLocaleLowerCase('vi');
+          const match = !query || haystack.includes(query);
+          module.hidden = !match;
+          const unit = module.id.replace('unit-', '');
+          const navLink = nav.querySelector('[data-unit="' + unit + '"]');
+          if (navLink) navLink.hidden = !match;
+          if (match) visible += 1;
+        });
+        empty.classList.toggle('show', visible === 0);
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+          event.preventDefault(); search.focus();
+        }
+        if (event.key === 'Escape' && document.activeElement === search) {
+          search.value = ''; search.dispatchEvent(new Event('input')); search.blur();
+        }
+      });
+
+      document.getElementById('print').addEventListener('click', function () { window.print(); });
+      const root = document.documentElement;
+      const storedTheme = localStorage.getItem('de01-theme');
+      if (storedTheme) root.dataset.theme = storedTheme;
+      document.getElementById('theme').addEventListener('click', function () {
+        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('de01-theme', root.dataset.theme);
+      });
+
+      const observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          nav.querySelectorAll('a').forEach(function (link) { link.classList.remove('active'); });
+          const link = nav.querySelector('[href="#' + entry.target.id + '"]');
+          if (link) link.classList.add('active');
+        });
+      }, { rootMargin: '-25% 0px -65% 0px' });
+      modules.forEach(function (module) { observer.observe(module); });
+      updateProgress();
+    }());
+  </script>
+</body>
+</html>

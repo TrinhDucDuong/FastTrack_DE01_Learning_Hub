@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 6: Python for Data Engineering"><title>DE01 · 06 · Python for Data Engineering</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="6"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 06 · Python for Data Engineering</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 06 / 18</div><h1>Python for Data Engineering</h1><p>Pipeline tiết kiệm bộ nhớ, rerun an toàn, test và audit được.</p><div class="lesson-meta"><span class="pill">Chunk</span><span class="pill">Watermark</span><span class="pill">Idempotency</span><span class="pill">Audit</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-python-cua-data-engineer-khac-gi-script-thong-thuong">1. Python của Data Engineer khác gì script thông thường?</h2>
+<p>Một pipeline tốt không chỉ &quot;chạy được&quot;. Nó phải đọc dữ liệu lớn hợp lý, có thể rerun an toàn, cấu hình được, test được, quan sát được và không làm lộ secret.</p>
+<p>Luồng cơ bản:</p>
+<pre><code>Extract -&gt; Validate -&gt; Transform -&gt; Load -&gt; Audit</code></pre>
+<h2 id="2-oc-du-lieu-theo-streaming-chunk">2. Đọc dữ liệu theo streaming/chunk</h2>
+<p>Không đọc toàn bộ file lớn vào RAM nếu không cần.</p>
+<pre><code>import csv
+
+with open(&quot;orders.csv&quot;, encoding=&quot;utf-8&quot;, newline=&quot;&quot;) as file:
+    for row in csv.DictReader(file):
+        process(row)</code></pre>
+<p>Với pandas có thể dùng <code>pd.read_csv(..., chunksize=100_000)</code>. Với dữ liệu phân tích lớn, ưu tiên Parquet vì có schema, column pruning và nén tốt hơn CSV.</p>
+<h2 id="3-generator-va-iterator">3. Generator và iterator</h2>
+<p>Generator trả từng phần tử, giúp giảm memory:</p>
+<pre><code>def valid_orders(rows):
+    for row in rows:
+        if row.get(&quot;order_id&quot;) and float(row[&quot;amount&quot;]) &gt;= 0:
+            yield row</code></pre>
+<p>Pipeline có thể nối nhiều generator: read → validate → transform → write.</p>
+<h2 id="4-validation-va-error-handling">4. Validation và error handling</h2>
+<p>Phân loại lỗi:</p>
+<ul>
+<li><strong>Transient</strong>: timeout, rate limit, network chập chờn → retry có giới hạn và exponential backoff.</li>
+<li><strong>Permanent/data error</strong>: sai schema, ngày không hợp lệ → không retry mù; đưa vào quarantine/dead-letter.</li>
+<li><strong>Programming error</strong>: bug code → fail fast, log stack trace, sửa và deploy lại.</li>
+</ul>
+<p>Không dùng <code>except Exception: pass</code>. Log tối thiểu: <code>run_id</code>, dataset, step, record key, error code; tránh log password/token/PII.</p>
+<h2 id="5-idempotency-va-incremental-load">5. Idempotency và incremental load</h2>
+<p>Rerun cùng input phải không tạo record trùng.</p>
+<ul>
+<li>Ghi đè partition của đúng ngày.</li>
+<li><code>MERGE/UPSERT</code> theo business key.</li>
+<li>Lưu <code>batch_id</code>, checksum hoặc source offset đã xử lý.</li>
+<li>Watermark: chỉ lấy dữ liệu mới hơn mốc trước, nhưng cần lookback window để bắt late-arriving data.</li>
+</ul>
+<p>Ví dụ watermark an toàn hơn:</p>
+<pre><code>last_success = 2026-09-20 00:00
+next_extract_from = last_success - 2 hours
+deduplicate after load</code></pre>
+<p>Chỉ cập nhật watermark sau khi target commit thành công.</p>
+<h2 id="6-cau-hinh-secret-va-moi-truong">6. Cấu hình, secret và môi trường</h2>
+<ul>
+<li>Config không nhạy cảm: file cấu hình hoặc environment variable.</li>
+<li>Secret: secret manager/managed identity; không hard-code và không commit Git.</li>
+<li>Tách <code>dev</code>, <code>test</code>, <code>prod</code>; không dùng chung bucket/schema đích.</li>
+<li>Pin dependency và ghi rõ phiên bản runtime.</li>
+</ul>
+<h2 id="7-logging-va-metrics">7. Logging và metrics</h2>
+<p>Log có cấu trúc dễ tìm kiếm:</p>
+<pre><code>logger.info(
+    &quot;batch_completed&quot;,
+    extra={&quot;run_id&quot;: run_id, &quot;rows_in&quot;: 1000, &quot;rows_out&quot;: 998, &quot;bad_rows&quot;: 2},
+)</code></pre>
+<p>Metrics quan trọng: duration, rows read/written/rejected, bytes, retry count, freshness lag. Alert cả khi job &quot;thành công&quot; nhưng zero record hoặc volume lệch mạnh.</p>
+<h2 id="8-test-pipeline">8. Test pipeline</h2>
+<ul>
+<li><strong>Unit test</strong>: một hàm transform với input nhỏ và expected output.</li>
+<li><strong>Contract/schema test</strong>: tên cột, kiểu, required field.</li>
+<li><strong>Integration test</strong>: đọc/ghi với database hoặc storage test.</li>
+<li><strong>Data quality test</strong>: unique, not null, range, relationship.</li>
+<li><strong>Rerun test</strong>: chạy hai lần, kết quả không nhân đôi.</li>
+</ul>
+<h2 id="9-cau-truc-project-goi-y">9. Cấu trúc project gợi ý</h2>
+<pre><code>pipeline/
+  src/
+    extract.py
+    transform.py
+    load.py
+    config.py
+  tests/
+  requirements.txt hoặc pyproject.toml
+  README.md</code></pre>
+<p>Tách I/O khỏi business logic để hàm transform dễ test. Hàm nhỏ, input/output rõ ràng, type hint hợp lý.</p>
+<h2 id="10-bai-thuc-hanh">10. Bài thực hành</h2>
+<p>Viết pipeline CSV → Parquet:</p>
+<ol>
+<li>Đọc theo chunk.</li>
+<li>Validate <code>order_id</code>, <code>created_at</code>, <code>amount</code>.</li>
+<li>Record lỗi ghi riêng cùng <code>error_reason</code>.</li>
+<li>Dữ liệu hợp lệ partition theo <code>order_date</code>.</li>
+<li>Log count và <code>run_id</code>.</li>
+<li>Chạy lại cùng file để chứng minh không trùng.</li>
+</ol>
+<h2 id="11-checklist-tu-kiem-tra">11. Checklist tự kiểm tra</h2>
+<ul>
+<li><span class="check"></span>File/connection luôn được đóng bằng context manager.</li>
+<li><span class="check"></span>Timeout và retry chỉ áp dụng cho lỗi transient.</li>
+<li><span class="check"></span>Không log secret hoặc PII thô.</li>
+<li><span class="check"></span>Watermark chỉ advance sau khi thành công.</li>
+<li><span class="check"></span>Có audit count và chiến lược quarantine/replay.</li>
+</ul>
+<h2 id="12-schema-first-thay-vi-oc-gi-cung-uoc">12. Schema-first thay vì &quot;đọc gì cũng được&quot;</h2>
+<p>Schema nên mô tả tên cột, type, nullable, domain, timezone và key. Infer schema tiện khi khám phá nhưng production có thể suy đoán khác giữa các batch (<code>001</code> thành số 1, cột toàn null thành string...).</p>
+<pre><code>from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+
+@dataclass(frozen=True)
+class Order:
+    order_id: int
+    customer_id: int
+    created_at: datetime
+    amount: Decimal</code></pre>
+<p>Tách parsing khỏi validation: parsing trả object hợp lệ hoặc error có code/cột/raw reference; không silently coerce giá trị mơ hồ.</p>
+<h2 id="13-thoi-gian-va-timezone">13. Thời gian và timezone</h2>
+<ul>
+<li>Lưu timestamp sự kiện ở UTC khi có thể; giữ source timezone nếu cần audit.</li>
+<li>Phân biệt event time, ingestion time và processing time.</li>
+<li>Date partition theo business timezone cần ghi rõ, không dựa timezone của máy chạy.</li>
+<li>DST làm một ngày có thể không đúng 24 giờ ở một số timezone.</li>
+</ul>
+<pre><code>from datetime import datetime, timezone
+
+ingestion_ts = datetime.now(timezone.utc)</code></pre>
+<p>Không dùng naive datetime cho dữ liệu đi qua nhiều hệ thống.</p>
+<h2 id="14-error-record-va-quarantine">14. Error record và quarantine</h2>
+<p>Một bad record hữu ích cần đủ để sửa/replay:</p>
+<pre><code>{
+  &quot;run_id&quot;: &quot;run_20260922_01&quot;,
+  &quot;source_file&quot;: &quot;orders_20260922.csv&quot;,
+  &quot;row_number&quot;: 18,
+  &quot;business_key&quot;: &quot;order_99&quot;,
+  &quot;error_code&quot;: &quot;INVALID_AMOUNT&quot;,
+  &quot;error_detail&quot;: &quot;amount must be &gt;= 0&quot;,
+  &quot;quarantined_at&quot;: &quot;2026-09-22T03:00:00Z&quot;
+}</code></pre>
+<p>Raw payload nhạy cảm có thể lưu ở vùng bảo vệ thay vì log. Quarantine phải có owner, retention và quy trình reprocess; nếu chỉ tích tụ file lỗi thì chưa giải quyết vận hành.</p>
+<h2 id="15-batch-manifest">15. Batch manifest</h2>
+<pre><code>batch_id, source, extract_from, extract_to,
+expected_files, received_files, source_rows,
+valid_rows, rejected_rows, target_rows,
+checksum, status, started_at, completed_at</code></pre>
+<p>Manifest là control plane cho dữ liệu: dùng phát hiện batch thiếu, ngăn process file dở, trace output và quyết định rerun.</p>
+<h2 id="16-retry-co-ky-luat">16. Retry có kỷ luật</h2>
+<pre><code>for attempt in range(max_attempts):
+    try:
+        return call_with_timeout()
+    except TransientError:
+        if attempt == max_attempts - 1:
+            raise
+        sleep(backoff(attempt) + jitter())</code></pre>
+<p>Phải có deadline tổng; nếu mỗi layer retry 3 lần, retry chồng có thể tạo rất nhiều request. Chọn một layer chịu trách nhiệm retry và phát metric số lần retry.</p>
+<h2 id="17-worked-example-incremental-orders">17. Worked example: incremental orders</h2>
+<ol>
+<li>Đọc watermark thành công <code>10:00</code>, chọn upper bound <code>11:00</code>.</li>
+<li>Extract <code>updated_at &gt;= 09:50 AND updated_at &lt; 11:00</code> để có lookback.</li>
+<li>Parse + validate; record lỗi vào quarantine.</li>
+<li>Deduplicate theo <code>order_id</code>, giữ <code>updated_at</code> mới nhất; tie-break bằng source sequence.</li>
+<li><code>MERGE</code> staging vào target.</li>
+<li>Reconcile source/staging/target impacted keys.</li>
+<li>Commit watermark <code>11:00</code> sau thành công.</li>
+</ol>
+<p>Nếu step 5 fail, watermark vẫn 10:00; rerun đọc lại overlap nhưng merge idempotent.</p>
+<h2 id="18-cau-hoi-co-ap-an">18. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Tại sao Parquet nhanh cho analytics?</strong> Columnar, nén tốt, có schema và đọc đúng cột/row group cần thiết.</li>
+<li><strong>Zero rejected rows có chắc tốt?</strong> Không; validator có thể chưa chạy hoặc rule quá lỏng.</li>
+<li><strong>Khi nào fail toàn batch?</strong> Contract/schema lõi hỏng hoặc tỷ lệ lỗi vượt policy; record lỗi cô lập có thể quarantine.</li>
+<li><strong>Watermark có thay backup không?</strong> Không; nó chỉ ghi tiến độ incremental.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-05.html"><small>← Bài trước</small><b>Data Modeling &amp; Warehousing Concepts</b></a><a class="next" href="unit-07.html"><small>Bài tiếp →</small><b>Distributed Processing with Spark &amp; PySpark</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 06 / 18</footer><script src="../assets/lesson.js"></script></body></html>

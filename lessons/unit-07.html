@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 7: Distributed Processing with Spark &amp; PySpark"><title>DE01 · 07 · Distributed Processing with Spark &amp; PySpark</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="7"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 07 · Distributed Processing with Spark &amp; PySpark</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 07 / 18</div><h1>Distributed Processing with Spark &amp; PySpark</h1><p>Hiểu partition, lazy execution, shuffle, skew và hiệu năng phân tán.</p><div class="lesson-meta"><span class="pill">Spark</span><span class="pill">Partition</span><span class="pill">Shuffle</span><span class="pill">Skew</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-khi-nao-can-spark">1. Khi nào cần Spark?</h2>
+<p>Spark phù hợp khi dữ liệu/compute cần chia cho nhiều core hoặc nhiều máy, hoặc cần xử lý song song ở quy mô lớn. Với file nhỏ và logic đơn giản, Python/pandas/SQL có thể rẻ và dễ vận hành hơn.</p>
+<h2 id="2-mental-model">2. Mental model</h2>
+<pre><code>Driver -&gt; lập kế hoạch job
+  |
+Cluster Manager -&gt; cấp tài nguyên
+  |
+Executors -&gt; chạy task trên các partition</code></pre>
+<ul>
+<li><strong>Application</strong> gồm một driver và nhiều executor.</li>
+<li><strong>Job</strong> thường được tạo khi gọi action.</li>
+<li><strong>Stage</strong> bị chia tại ranh giới shuffle.</li>
+<li><strong>Task</strong> xử lý một partition trong một stage.</li>
+<li><strong>Partition</strong> là đơn vị dữ liệu để Spark xử lý song song.</li>
+</ul>
+<h2 id="3-lazy-evaluation">3. Lazy evaluation</h2>
+<p>Transformation như <code>select</code>, <code>filter</code>, <code>join</code> chỉ tạo logical plan. Action như <code>count</code>, <code>collect</code>, <code>write</code> mới kích hoạt thực thi.</p>
+<pre><code>from pyspark.sql import functions as F
+
+orders = spark.read.parquet(&quot;/bronze/orders&quot;)
+daily = (
+    orders.filter(F.col(&quot;status&quot;) == &quot;Completed&quot;)
+          .withColumn(&quot;order_date&quot;, F.to_date(&quot;created_at&quot;))
+          .groupBy(&quot;order_date&quot;)
+          .agg(F.sum(&quot;amount&quot;).alias(&quot;revenue&quot;))
+)
+daily.write.mode(&quot;overwrite&quot;).partitionBy(&quot;order_date&quot;).parquet(&quot;/gold/daily_revenue&quot;)</code></pre>
+<h2 id="4-dataframe-va-spark-sql">4. DataFrame và Spark SQL</h2>
+<p>DataFrame có schema nên Spark có thể tối ưu kế hoạch. DataFrame API và Spark SQL dùng cùng execution engine; chọn cách dễ đọc nhất cho team.</p>
+<p>Ưu tiên built-in functions thay vì Python UDF vì optimizer hiểu được biểu thức built-in và tránh overhead serialize Python/JVM.</p>
+<h2 id="5-narrow-va-wide-transformation">5. Narrow và wide transformation</h2>
+<ul>
+<li><strong>Narrow</strong>: output partition phụ thuộc ít input partition, ví dụ <code>filter</code>, <code>select</code>.</li>
+<li><strong>Wide</strong>: dữ liệu phải đổi máy (shuffle), ví dụ <code>groupBy</code>, <code>distinct</code>, nhiều loại <code>join</code>.</li>
+</ul>
+<p>Shuffle tốn network, disk và memory. Không phải bỏ hết shuffle, mà phải hiểu và giảm shuffle không cần thiết.</p>
+<h2 id="6-join-va-data-skew">6. Join và data skew</h2>
+<ul>
+<li>Broadcast bảng dimension nhỏ để tránh shuffle bảng lớn.</li>
+<li>Filter/select cột sớm để giảm dữ liệu trước join.</li>
+<li>Kiểm tra key nóng: một key chiếm phần lớn record gây một task rất chậm.</li>
+<li><code>repartition</code> tạo shuffle; <code>coalesce</code> thường giảm partition với ít shuffle hơn.</li>
+</ul>
+<p>Luôn kiểm tra execution plan bằng <code>df.explain()</code> và Spark UI trước khi tăng cluster.</p>
+<h2 id="7-cache-partition-va-small-files">7. Cache, partition và small files</h2>
+<ul>
+<li>Chỉ <code>cache/persist</code> DataFrame được tái sử dụng; cache cũng tốn tài nguyên.</li>
+<li>Partition storage theo cột thường dùng để lọc và cardinality vừa phải, ví dụ <code>order_date</code>.</li>
+<li>Không partition theo <code>user_id</code> hàng triệu giá trị.</li>
+<li>Quá nhiều file nhỏ làm metadata/listing chậm; compact file theo lịch.</li>
+<li>Không dùng <code>collect()</code> cho dữ liệu lớn vì kéo tất cả về driver.</li>
+</ul>
+<h2 id="8-fault-tolerance-va-rerun">8. Fault tolerance và rerun</h2>
+<p>Spark có thể chạy lại task mất dựa trên lineage, nhưng pipeline vẫn phải idempotent ở output. Job retry không tự đảm bảo dữ liệu không trùng. Cần overwrite đúng partition, transactional table hoặc <code>MERGE</code> theo key.</p>
+<h2 id="9-debug-hieu-nang">9. Debug hiệu năng</h2>
+<table><thead><tr><th>Tín hiệu</th><th>Khả năng</th><th>Kiểm tra đầu tiên</th></tr></thead><tbody><tr><td>Một task lâu bất thường</td><td>Data skew</td><td>Partition distribution, Spark UI</td></tr><tr><td>Executor OOM</td><td>Partition quá lớn, cache/UDF/join</td><td>Executor log, shuffle, plan</td></tr><tr><td>Job chậm sau <code>groupBy</code></td><td>Shuffle lớn</td><td>Số partition và data volume</td></tr><tr><td>Driver OOM</td><td><code>collect/toPandas</code></td><td>Code action và driver log</td></tr><tr><td>Nhiều task rất nhỏ</td><td>Too many small files/partitions</td><td>Input files và partition count</td></tr></tbody></table>
+<h2 id="10-bai-thuc-hanh-pyspark">10. Bài thực hành PySpark</h2>
+<p>Từ <code>orders</code> và <code>order_items</code>:</p>
+<ol>
+<li>Ép schema rõ ràng, không dựa hoàn toàn vào infer schema.</li>
+<li>Lọc order completed.</li>
+<li>Join, tính revenue theo ngày và category.</li>
+<li>Kiểm tra row count trước/sau join để phát hiện nhân bản.</li>
+<li>Dùng <code>explain</code>, nhận diện shuffle.</li>
+<li>Ghi Parquet partition theo ngày và tránh file quá nhỏ.</li>
+</ol>
+<h2 id="11-checklist-tu-kiem-tra">11. Checklist tự kiểm tra</h2>
+<ul>
+<li><span class="check"></span>Biết grain và schema trước transform.</li>
+<li><span class="check"></span>Không <code>collect()</code> dữ liệu lớn.</li>
+<li><span class="check"></span>Built-in expression được ưu tiên hơn Python UDF.</li>
+<li><span class="check"></span>Kiểm tra skew/shuffle trước khi scale compute.</li>
+<li><span class="check"></span>Output rerun an toàn và có kiểm tra count.</li>
+</ul>
+<p>Tài liệu chính: <a href="https://spark.apache.org/docs/latest/sql-programming-guide/" target="_blank" rel="noreferrer">Spark SQL và DataFrames</a>.</p>
+<h2 id="12-tu-logical-plan-en-physical-plan">12. Từ logical plan đến physical plan</h2>
+<p>Spark phân tích expression/schema, tối ưu logical plan rồi chọn physical operators. <code>df.explain(&quot;formatted&quot;)</code> giúp thấy scan, filter, exchange/shuffle, join và aggregate.</p>
+<pre><code>FileScan parquet
+  -&gt; Filter status = Completed
+  -&gt; Exchange hashpartitioning(customer_id)   # shuffle boundary
+  -&gt; HashAggregate</code></pre>
+<p>Predicate pushdown và column pruning giảm dữ liệu từ lúc scan. UDF mờ với optimizer có thể làm mất cơ hội tối ưu.</p>
+<h2 id="13-join-strategy">13. Join strategy</h2>
+<ul>
+<li><strong>Broadcast hash join</strong>: gửi bảng nhỏ tới executors; tránh shuffle bảng lớn nhưng bảng broadcast phải vừa memory.</li>
+<li><strong>Sort-merge join</strong>: hai phía shuffle/sort theo key; phù hợp equi-join lớn.</li>
+<li><strong>Shuffle hash join</strong>: build hash table theo partition; nhạy với memory/skew.</li>
+</ul>
+<p>Không ép broadcast chỉ vì dimension &quot;có vẻ nhỏ&quot;; kiểm tra kích thước sau filter và threshold/runtime.</p>
+<h2 id="14-data-skew-bang-vi-du">14. Data skew bằng ví dụ</h2>
+<p>Nếu 40% events có <code>customer_id = null</code>, hash partition dồn chúng vào một task. Dấu hiệu: đa số task hoàn tất nhanh nhưng một vài task rất lâu/oom.</p>
+<p>Các hướng xử lý:</p>
+<ul>
+<li>Tách null/khóa nóng xử lý riêng.</li>
+<li>Pre-aggregate trước join.</li>
+<li>Broadcast phía nhỏ.</li>
+<li>Salting key cho key nóng rồi aggregate lại.</li>
+<li>Bật/tận dụng adaptive query execution nếu platform hỗ trợ, nhưng vẫn đo.</li>
+</ul>
+<p>Salting tăng complexity và có thể nhân bản dimension; chỉ dùng sau khi xác nhận skew.</p>
+<h2 id="15-partition-in-memory-khac-partition-on-storage">15. Partition in-memory khác partition on storage</h2>
+<p>Spark partition là đơn vị task runtime. Storage partition là folder/pruning layout. Đọc một folder ngày có thể tạo nhiều Spark partitions dựa trên file size. <code>partitionBy(&quot;order_date&quot;)</code> khi ghi không đảm bảo mỗi ngày đúng một file.</p>
+<p><code>repartition(n, key)</code> shuffle và cân lại; <code>coalesce(n)</code> thường chỉ giảm số partition, có thể mất cân bằng. Số partition tốt phụ thuộc data size, cluster, operator và target file size.</p>
+<h2 id="16-fault-tolerance-khong-thay-idempotency">16. Fault tolerance không thay idempotency</h2>
+<p>Executor chết: Spark có thể rerun task từ lineage. Nhưng nếu task đã gọi API bên ngoài hoặc append sink trước khi chết, side effect có thể lặp. Tránh external side effect trong row UDF; output dùng staging/transactional commit hoặc overwrite partition deterministic.</p>
+<h2 id="17-worked-example-toi-uu-daily-revenue">17. Worked example: tối ưu daily revenue</h2>
+<ol>
+<li>Chỉ đọc partition 7 ngày cần recompute.</li>
+<li>Select cột order/item cần thiết.</li>
+<li>Filter completed trước join.</li>
+<li>Broadcast <code>dim_product</code> nếu đủ nhỏ.</li>
+<li>Aggregate theo <code>order_date, category</code>.</li>
+<li>Repartition hợp lý theo output date và ghi staging.</li>
+<li>Validate totals, rồi publish/replace impacted partitions.</li>
+</ol>
+<p>Đo input bytes, shuffle read/write, task duration distribution và output file count trước/sau; không dùng cảm giác.</p>
+<h2 id="18-cau-hoi-co-ap-an">18. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Transformation nào luôn tạo shuffle?</strong> Grouping và repartition thường có; join có thể tránh shuffle một phía bằng broadcast.</li>
+<li><strong>Cache càng nhiều càng tốt?</strong> Không; cache chiếm memory và có cost materialize/evict.</li>
+<li><strong>Vì sao <code>collect()</code> nguy hiểm?</strong> Dồn toàn bộ output về driver, có thể OOM.</li>
+<li><strong>Tăng executor có chữa skew không?</strong> Thường không chữa key nóng; một partition vẫn do một task xử lý.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-06.html"><small>← Bài trước</small><b>Python for Data Engineering</b></a><a class="next" href="unit-08.html"><small>Bài tiếp →</small><b>Data Transformation with dbt</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 07 / 18</footer><script src="../assets/lesson.js"></script></body></html>

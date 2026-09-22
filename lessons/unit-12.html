@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 12: Real-time Data Streaming on Azure"><title>DE01 · 12 · Real-time Data Streaming on Azure</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="12"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 12 · Real-time Data Streaming on Azure</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 12 / 18</div><h1>Real-time Data Streaming on Azure</h1><p>Xử lý event liên tục với partition, checkpoint và delivery semantics.</p><div class="lesson-meta"><span class="pill">Event Hubs</span><span class="pill">Streaming</span><span class="pill">Watermark</span><span class="pill">Checkpoint</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-streaming-khong-co-nghia-la-ngay-lap-tuc">1. Streaming không có nghĩa là &quot;ngay lập tức&quot;</h2>
+<p>Streaming xử lý luồng event liên tục với latency thấp hơn batch. Trước khi chọn, phải xác định SLA: vài giây, vài phút hay một giờ. Nếu business chấp nhận hàng giờ, batch thường đơn giản và rẻ hơn.</p>
+<pre><code>Producers -&gt; Event Hubs -&gt; Stream processor -&gt; Bronze/Silver -&gt; Serving
+                  \-&gt; checkpoint / monitoring / dead-letter</code></pre>
+<h2 id="2-event-hubs-mental-model">2. Event Hubs mental model</h2>
+<ul>
+<li><strong>Namespace</strong>: container quản lý cho các event hub.</li>
+<li><strong>Event hub/topic</strong>: append-only stream.</li>
+<li><strong>Partition</strong>: log có thứ tự; thứ tự chỉ được đảm bảo trong từng partition.</li>
+<li><strong>Partition key</strong>: quyết định event vào partition nào; cùng key thường giữ ordering.</li>
+<li><strong>Offset/sequence</strong>: vị trí event trong partition.</li>
+<li><strong>Consumer group</strong>: một góc nhìn độc lập của cùng stream cho một ứng dụng tiêu thụ.</li>
+<li><strong>Retention</strong>: event chỉ được giữ theo thời hạn cấu hình; data lake mới là nơi lưu dài hạn.</li>
+</ul>
+<p>Partition tăng parallelism nhưng key lệch có thể tạo hotspot. Số consumer instance hữu ích bị giới hạn bởi số partition trong consumer group.</p>
+<h2 id="3-delivery-semantics">3. Delivery semantics</h2>
+<ul>
+<li><strong>At-most-once</strong>: có thể mất event, ít duplicate.</li>
+<li><strong>At-least-once</strong>: không muốn mất nhưng có thể nhận trùng; rất phổ biến.</li>
+<li><strong>Exactly-once effect</strong>: thường đạt ở kết quả nghiệp vụ bằng source replay + checkpoint + dedup/idempotent sink, không chỉ nhờ một nhãn cấu hình.</li>
+</ul>
+<p>Thiết kế <code>event_id</code> hoặc business key + version/timestamp để deduplicate.</p>
+<h2 id="4-event-time-va-processing-time">4. Event time và processing time</h2>
+<ul>
+<li><strong>Event time</strong>: lúc sự kiện thực sự xảy ra.</li>
+<li><strong>Processing time</strong>: lúc hệ thống xử lý.</li>
+<li><strong>Late event</strong>: đến sau khoảng mong đợi.</li>
+<li><strong>Watermark</strong>: ngưỡng hệ thống chờ event muộn trước khi dọn state/finalize window.</li>
+</ul>
+<p>Window phổ biến: tumbling (không chồng), sliding (chồng), session (theo khoảng hoạt động). Watermark càng rộng càng bắt được late data nhưng giữ state lâu hơn.</p>
+<h2 id="5-structured-streaming">5. Structured Streaming</h2>
+<p>Spark Structured Streaming dùng DataFrame API cho stream:</p>
+<pre><code>events = (
+    spark.readStream.format(&quot;eventhubs&quot;)
+         .options(**event_hubs_config)
+         .load()
+)
+
+query = (
+    transformed.writeStream
+      .option(&quot;checkpointLocation&quot;, checkpoint_path)
+      .outputMode(&quot;append&quot;)
+      .start(output_path)
+)</code></pre>
+<p>Checkpoint phải ở durable storage, tách theo query và được bảo vệ quyền truy cập. Xóa checkpoint có thể làm mất tiến độ hoặc replay dữ liệu tùy cách start.</p>
+<h2 id="6-schema-evolution-va-poison-message">6. Schema evolution và poison message</h2>
+<ul>
+<li>Event có version/schema contract.</li>
+<li>Thêm nullable field thường dễ tương thích hơn đổi tên/đổi type.</li>
+<li>Validate compatibility trước release producer.</li>
+<li>Record không parse được đi quarantine/dead-letter cùng error reason và metadata.</li>
+<li>Không để một poison message chặn cả partition vô thời hạn.</li>
+</ul>
+<h2 id="7-monitoring">7. Monitoring</h2>
+<p>Theo dõi đồng thời:</p>
+<ul>
+<li>Ingress/egress throughput và throttling.</li>
+<li>Consumer lag theo partition.</li>
+<li>Event age/freshness.</li>
+<li>Parse error, duplicate, dead-letter volume.</li>
+<li>Processing rate, batch duration, state size, checkpoint error.</li>
+<li>Sink latency và failure.</li>
+</ul>
+<p>&quot;Job vẫn running&quot; không có nghĩa là healthy. Lag tăng hai giờ có thể do compute thiếu, skew partition, downstream chậm hoặc throttling.</p>
+<h2 id="8-recovery-va-replay">8. Recovery và replay</h2>
+<ul>
+<li>Event retention phải dài hơn thời gian phát hiện + phục hồi dự kiến.</li>
+<li>Capture/raw landing giúp replay ngoài retention của stream.</li>
+<li>Lưu source offset/checkpoint và mapping tới <code>run_id</code>.</li>
+<li>Sink phải idempotent khi replay.</li>
+<li>Viết runbook cho checkpoint corrupt, credential hết hạn, schema incompatible và lag tăng.</li>
+</ul>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Thiết kế clickstream:</p>
+<ol>
+<li>Chọn partition key và giải thích ordering/skew.</li>
+<li>Mỗi event có <code>event_id</code>, <code>event_time</code>, <code>schema_version</code>.</li>
+<li>Tạo revenue window 5 phút với watermark 15 phút.</li>
+<li>Quarantine JSON lỗi.</li>
+<li>Ghi raw để replay và Silver đã deduplicate.</li>
+<li>Đề xuất alert cho lag, zero ingress và dead-letter spike.</li>
+</ol>
+<h2 id="10-checklist">10. Checklist</h2>
+<ul>
+<li><span class="check"></span>SLA latency thực sự cần streaming.</li>
+<li><span class="check"></span>Partition key không tạo hotspot.</li>
+<li><span class="check"></span>Có event ID, schema version và event time.</li>
+<li><span class="check"></span>Consumer xử lý duplicate/out-of-order/late event.</li>
+<li><span class="check"></span>Checkpoint durable; sink idempotent; có đường replay.</li>
+</ul>
+<p>Tài liệu chính: <a href="https://learn.microsoft.com/azure/event-hubs/event-hubs-scalability" target="_blank" rel="noreferrer">Azure Event Hubs scalability</a>, <a href="https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html" target="_blank" rel="noreferrer">Spark Structured Streaming</a>.</p>
+<h2 id="11-thiet-ke-event-contract">11. Thiết kế event contract</h2>
+<pre><code>{
+  &quot;event_id&quot;: &quot;evt_01...&quot;,
+  &quot;event_type&quot;: &quot;order.completed&quot;,
+  &quot;event_version&quot;: 2,
+  &quot;occurred_at&quot;: &quot;2026-09-22T03:10:04Z&quot;,
+  &quot;producer&quot;: &quot;order-service&quot;,
+  &quot;aggregate_id&quot;: &quot;order_123&quot;,
+  &quot;payload&quot;: {&quot;customer_id&quot;: 10, &quot;net_amount&quot;: 120.50}
+}</code></pre>
+<p>Envelope chuẩn giúp trace, deduplicate, route và evolve schema. Event là fact đã xảy ra; tên ở past tense giảm nhầm với command.</p>
+<h2 id="12-partition-key-trade-off">12. Partition key trade-off</h2>
+<p>Chọn <code>order_id</code> giữ thứ tự event của cùng order và phân phối tương đối đều. Chọn <code>country</code> có ít key dễ hotspot. Không có global ordering khi nhiều partition; nếu business cần global order, chi phí/throughput thay đổi lớn và cần xem lại requirement.</p>
+<h2 id="13-consumer-group-bang-vi-du">13. Consumer group bằng ví dụ</h2>
+<p>Fraud detector và lake ingestion cần đọc cùng stream độc lập → hai consumer groups. Scale-out các instance của cùng ứng dụng → cùng consumer group để chia ownership partition. Tạo consumer group mới không tự đọc vô hạn lịch sử ngoài retention.</p>
+<h2 id="14-watermark-worked-example">14. Watermark worked example</h2>
+<p>Window 5 phút, allowed lateness 15 phút:</p>
+<ul>
+<li>Event time 10:03 đến lúc 10:04: vào window 10:00–10:05.</li>
+<li>Event time 10:03 đến lúc 10:14: late nhưng còn trong policy, aggregate được update.</li>
+<li>Event time 10:03 đến sau watermark vượt window + 15 phút: bị drop/route tùy engine và output mode.</li>
+</ul>
+<p>Policy phải dựa phân phối lateness đo được và nhu cầu sửa báo cáo, không chọn tùy ý.</p>
+<h2 id="15-exactly-once-can-nhin-end-to-end">15. Exactly-once cần nhìn end-to-end</h2>
+<p>Checkpoint có thể đảm bảo engine biết offset nào đã xử lý, nhưng sink/API bên ngoài vẫn có thể ghi trùng khi crash giữa write và checkpoint. Cách đạt hiệu ứng exactly-once:</p>
+<ul>
+<li>Transactional/idempotent sink.</li>
+<li>Deterministic event ID/business key.</li>
+<li>Dedup state hoặc unique constraint.</li>
+<li>Atomic commit giữa progress và output nếu platform hỗ trợ.</li>
+</ul>
+<p>Luôn mô tả boundary guarantee thay vì nói toàn hệ thống &quot;exactly once&quot;.</p>
+<h2 id="16-backpressure-va-lag">16. Backpressure và lag</h2>
+<p>Khi input rate &gt; processing rate, lag tăng. Điều tra:</p>
+<ol>
+<li>Có partition hotspot không?</li>
+<li>Processing có chậm do state/shuffle/UDF không?</li>
+<li>Sink có throttle/latency không?</li>
+<li>Compute có đủ và autoscale kịp không?</li>
+<li>Retention còn đủ thời gian recovery không?</li>
+</ol>
+<p>Scale consumer nhiều hơn số partition không tăng parallelism hữu ích trong consumer group.</p>
+<h2 id="17-cau-hoi-co-ap-an">17. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Offset có phải event ID?</strong> Không; offset là vị trí trong partition, event ID phục vụ identity/dedup nghiệp vụ.</li>
+<li><strong>Một partition có ordering với partition khác không?</strong> Không có global ordering guarantee.</li>
+<li><strong>Streaming thay batch hoàn toàn không?</strong> Không; backfill/reconciliation thường vẫn dùng batch.</li>
+<li><strong>Checkpoint có nên đặt local disk worker?</strong> Không cho production durable recovery; worker mất sẽ mất progress.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-11.html"><small>← Bài trước</small><b>Batch Data Processing on Azure</b></a><a class="next" href="unit-13.html"><small>Bài tiếp →</small><b>Monitoring &amp; Operations on Azure</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 12 / 18</footer><script src="../assets/lesson.js"></script></body></html>

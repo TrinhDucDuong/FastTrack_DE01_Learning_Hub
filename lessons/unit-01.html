@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 1: Version Control with Git"><title>DE01 · 01 · Version Control with Git</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="1"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 01 · Version Control with Git</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 01 / 18</div><h1>Version Control with Git</h1><p>Quản lý thay đổi như các snapshot có thể review, truy vết và phục hồi.</p><div class="lesson-meta"><span class="pill">Git</span><span class="pill">Branch</span><span class="pill">Pull Request</span><span class="pill">Recovery</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content">
+<h2 id="1-mental-model">1. Mental model</h2>
+<pre><code>Working directory -&gt; git add -&gt; Staging area -&gt; git commit -&gt; Local repository
+                                                        -&gt; git push -&gt; Remote</code></pre>
+<ul>
+<li><strong>Commit</strong>: snapshot có ID, author, time và parent.</li>
+<li><strong>Branch</strong>: con trỏ tới một chuỗi commit; <strong>HEAD</strong> là vị trí hiện tại.</li>
+<li><strong>Remote</strong>: repository ở server, thường tên <code>origin</code>.</li>
+<li><strong>Working tree / staging</strong>: thay đổi đang làm / phần sẽ vào commit kế tiếp.</li>
+</ul>
+<h2 id="2-workflow-co-ban">2. Workflow cơ bản</h2>
+<pre><code>git status
+git switch -c feature/orders-ingestion
+git add path/to/file.py
+git diff --staged
+git commit -m &quot;Add incremental orders ingestion&quot;
+git fetch origin
+git rebase origin/main
+git push -u origin feature/orders-ingestion</code></pre>
+<p>Luôn xem <code>git status</code> và <code>git diff</code> trước commit. Add đúng file thay vì <code>git add .</code> khi workspace có thay đổi không liên quan.</p>
+<h2 id="3-commit-tot-va-an-toan">3. Commit tốt và an toàn</h2>
+<ul>
+<li>Một commit giải quyết một ý logic; message nói rõ intent.</li>
+<li>Không trộn format toàn project với feature nhỏ.</li>
+<li>Không commit secret, <code>.env</code>, output data lớn hoặc virtual environment.</li>
+<li><code>.gitignore</code> chỉ ngăn file chưa tracked; không xóa secret khỏi history.</li>
+<li>Nếu secret đã commit: revoke/rotate ngay, sau đó xử lý history theo quy trình team.</li>
+</ul>
+<h2 id="4-merge-rebase-va-conflict">4. Merge, rebase và conflict</h2>
+<ul>
+<li><strong>Merge</strong> kết hợp lịch sử và có thể tạo merge commit.</li>
+<li><strong>Rebase</strong> đặt commit của mình lên base mới; lịch sử gọn nhưng commit ID đổi.</li>
+<li>Không rebase/force-push branch dùng chung nếu chưa thống nhất.</li>
+</ul>
+<p>Khi conflict: đọc intent hai phía → sửa kết quả đúng → chạy test → <code>git add</code> → <code>git rebase --continue</code> hoặc commit merge.</p>
+<h2 id="5-pull-request">5. Pull request</h2>
+<p>PR nên có vấn đề/phạm vi, cách test, ảnh hưởng schema/data/downstream, migration và rollback/recovery. Reviewer kiểm tra correctness, security, maintainability và operational risk; không chỉ style.</p>
+<h2 id="6-lenh-cuu-ho">6. Lệnh cứu hộ</h2>
+<pre><code>git diff
+git diff --staged
+git log --oneline --graph --decorate -20
+git restore --staged file
+git stash push -m &quot;wip&quot;
+git reflog
+git revert &lt;commit&gt;</code></pre>
+<p><code>reset --hard</code>, clean và force push có thể làm mất thay đổi; chỉ dùng khi hiểu chính xác target và policy.</p>
+<h2 id="7-git-cho-data-engineering">7. Git cho Data Engineering</h2>
+<p>Version control SQL/dbt, DAG, Spark/Python, schema contract, tests, IaC và config không nhạy cảm. Dataset lớn để trong object storage/artifact system. Schema migration phải đi cùng thứ tự deploy và compatibility plan. Tag/release ID nên xuất hiện trong pipeline log để biết code nào tạo dataset.</p>
+<h2 id="8-bai-thuc-hanh-va-checklist">8. Bài thực hành và checklist</h2>
+<p>Tạo feature branch, chia thay đổi thành hai commit, tạo/resolve một conflict, rebase lên <code>main</code>, chạy test và mở PR. Sau đó thử <code>git revert</code> trên nhánh demo.</p>
+<ul>
+<li><span class="check"></span>Phân biệt working tree, staging, commit và remote.</li>
+<li><span class="check"></span>Commit nhỏ, rõ và không có secret/data lớn.</li>
+<li><span class="check"></span>Biết merge/rebase khác nhau ở đâu.</li>
+<li><span class="check"></span>Resolve conflict xong luôn chạy test.</li>
+<li><span class="check"></span>PR nêu data/schema impact và recovery.</li>
+</ul>
+<h2 id="9-giai-thich-sau-git-that-su-luu-gi">9. Giải thích sâu: Git thật sự lưu gì?</h2>
+<p>Git không lưu một chuỗi &quot;dòng đã sửa&quot; như cách ta thường hình dung. Mỗi commit trỏ tới một cây thư mục (tree), metadata và commit cha. File content được lưu dưới dạng object có hash. Vì commit chứa hash của parent, lịch sử tạo thành một đồ thị bất biến tương đối: đổi nội dung hoặc parent sẽ tạo commit ID khác.</p>
+<p>Điều này giải thích ba hiện tượng:</p>
+<ul>
+<li>Branch rất nhẹ vì chủ yếu là một con trỏ tới commit.</li>
+<li>Rebase tạo commit ID mới vì parent thay đổi, dù nội dung nhìn giống nhau.</li>
+<li>Detached HEAD nghĩa là HEAD trỏ thẳng commit thay vì branch; commit mới có thể khó tìm nếu không tạo branch.</li>
+</ul>
+<h2 id="10-fetch-pull-va-push-theo-vi-du">10. Fetch, pull và push theo ví dụ</h2>
+<p>Giả sử local có <code>main</code>, remote-tracking branch là <code>origin/main</code>:</p>
+<pre><code>git fetch  = cập nhật hiểu biết local về remote, chưa sửa working branch
+git merge origin/main = nhập lịch sử remote vào branch hiện tại
+git pull   = fetch + merge (hoặc rebase tùy config)
+git push   = đề nghị remote cập nhật ref nếu lịch sử hợp lệ</code></pre>
+<p>Workflow an toàn khi đang làm feature:</p>
+<pre><code>git status
+git fetch origin
+git rebase origin/main
+# resolve conflict + test
+git push --force-with-lease  # chỉ khi feature branch riêng đã rebase</code></pre>
+<p><code>--force-with-lease</code> vẫn là force push nhưng từ chối ghi đè nếu remote đã có commit mình chưa thấy. Nó không biến force push thành hoàn toàn an toàn.</p>
+<h2 id="11-worked-example-sua-pipeline-bang-hai-commit">11. Worked example: sửa pipeline bằng hai commit</h2>
+<p>Yêu cầu: thêm validation <code>amount &gt;= 0</code> và test.</p>
+<ol>
+<li>Commit 1 chỉ thêm validation + unit test.</li>
+<li>Commit 2 thêm metric <code>invalid_amount_count</code> + documentation.</li>
+<li>PR giải thích record lỗi bị quarantine, không bị âm thầm bỏ.</li>
+<li>Reviewer có thể revert riêng metric mà không mất bug fix.</li>
+</ol>
+<p>Nếu gộp refactor, đổi format, validation và dashboard vào một commit, review khó và rollback mang theo thay đổi không liên quan.</p>
+<h2 id="12-tinh-huong-production">12. Tình huống production</h2>
+<h3 id="lo-commit-secret">Lỡ commit secret</h3>
+<ol>
+<li>Xem secret như đã bị lộ, kể cả repository private.</li>
+<li>Revoke/rotate credential trước.</li>
+<li>Tìm nơi secret được dùng và theo dõi access log.</li>
+<li>Xóa khỏi history bằng công cụ/quy trình của team nếu cần.</li>
+<li>Thêm secret scanning và pre-commit/CI check để ngăn tái diễn.</li>
+</ol>
+<h3 id="commit-tot-nhung-pipeline-production-loi">Commit tốt nhưng pipeline production lỗi</h3>
+<p>Dùng <code>git revert</code> tạo commit đảo thay đổi trên branch chung. Không rewrite lịch sử production branch. Nếu pipeline đã ghi dữ liệu sai, revert code chưa đủ: cần xác định partition bị ảnh hưởng, restore/recompute và đối soát lại.</p>
+<h2 id="13-cau-hoi-tu-kiem-tra-co-ap-an">13. Câu hỏi tự kiểm tra có đáp án</h2>
+<ol>
+<li><strong>Vì sao <code>git fetch</code> an toàn để kiểm tra trước?</strong> Vì nó cập nhật remote-tracking refs mà không merge vào working branch.</li>
+<li><strong>Vì sao rebase branch chung nguy hiểm?</strong> Nó thay commit ID, khiến lịch sử của người khác phân kỳ.</li>
+<li><strong>Khi nào dùng revert?</strong> Khi commit đã chia sẻ và cần đảo bằng một thay đổi có audit trail.</li>
+<li><strong>Git có phù hợp lưu file Parquet 10 GB không?</strong> Không; lưu data ở object storage và version metadata/manifest trong Git.</li>
+</ol></main></div>
+<nav class="lesson-nav"><span></span><a class="next" href="unit-02.html"><small>Bài tiếp →</small><b>Python for Application Development</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 01 / 18</footer><script src="../assets/lesson.js"></script></body></html>

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 17: Capstone: End-to-End Analytics Pipeline"><title>DE01 · 17 · Capstone: End-to-End Analytics Pipeline</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="17"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 17 · Capstone: End-to-End Analytics Pipeline</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 17 / 18</div><h1>Capstone: End-to-End Analytics Pipeline</h1><p>Gom mọi mảnh thành một lát cắt nhỏ nhưng chạy, test và demo được.</p><div class="lesson-meta"><span class="pill">Capstone</span><span class="pill">Architecture</span><span class="pill">Reliability</span><span class="pill">Demo</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-muc-tieu-capstone">1. Mục tiêu capstone</h2>
+<p>Xây một lát cắt end-to-end đủ nhỏ để hoàn thành nhưng thể hiện được năng lực: ingest, storage, transform, model, orchestration, quality, security, monitoring, CI/CD và báo cáo.</p>
+<p>Đề bài gợi ý: pipeline analytics e-commerce trả lời:</p>
+<ul>
+<li>Doanh thu/ngày/category là bao nhiêu?</li>
+<li>Top sản phẩm và khách hàng là ai?</li>
+<li>Tỷ lệ đơn hoàn tất/hủy là bao nhiêu?</li>
+<li>Dữ liệu mới nhất đến thời điểm nào?</li>
+</ul>
+<h2 id="2-kien-truc-tham-chieu">2. Kiến trúc tham chiếu</h2>
+<pre><code>OLTP DB / API / files
+        |
+        v
+ADF ingest batch ---------&gt; ADLS Bronze (raw + audit)
+        |                         |
+        |                         v
+        +-----------------&gt; Spark/Databricks
+                                  |
+                      Silver (clean/conformed)
+                                  |
+                             dbt / SQL
+                                  |
+                      Gold (star schema + KPI)
+                                  |
+                       Warehouse / Power BI
+
+Airflow or chosen orchestrator: dependencies/backfill
+Azure Monitor: logs/metrics/alerts
+Entra ID/Key Vault/RBAC/private access: security
+Git + CI/CD + IaC: delivery</code></pre>
+<p>Không bắt buộc dùng mọi dịch vụ. Nếu một công cụ không tạo giá trị cho scope, ghi rõ lý do loại bỏ. Kiến trúc đơn giản nhưng chạy ổn tốt hơn sơ đồ nhiều logo.</p>
+<h2 id="3-scope-mvp">3. Scope MVP</h2>
+<h3 id="sources">Sources</h3>
+<ul>
+<li><code>orders</code>, <code>order_items</code>, <code>customers</code>, <code>products</code>.</li>
+<li>Batch daily là bắt buộc; streaming là phần mở rộng nếu còn thời gian.</li>
+</ul>
+<h3 id="bronze">Bronze</h3>
+<ul>
+<li>Raw immutable/replayable.</li>
+<li>Có <code>source_system</code>, <code>source_file</code>, <code>ingestion_ts</code>, <code>run_id</code>, <code>batch_id</code>.</li>
+<li>Manifest/checksum/count và quarantine file lỗi.</li>
+</ul>
+<h3 id="silver">Silver</h3>
+<ul>
+<li>Schema rõ, ép type, chuẩn hóa timezone/currency.</li>
+<li>Deduplicate theo key + update timestamp.</li>
+<li>Giải quyết null/reference orphan và record lỗi.</li>
+</ul>
+<h3 id="gold">Gold</h3>
+<ul>
+<li><code>fact_sales</code> có grain một order item.</li>
+<li><code>dim_date</code>, <code>dim_customer</code>, <code>dim_product</code>.</li>
+<li>SCD Type 2 cho ít nhất một dimension nếu có lịch sử hợp lý.</li>
+<li>KPI có định nghĩa và test.</li>
+</ul>
+<h2 id="4-non-functional-requirements">4. Non-functional requirements</h2>
+<ul>
+<li><strong>Correctness</strong>: control total và data quality gate.</li>
+<li><strong>Idempotency</strong>: chạy lại cùng interval không tạo trùng.</li>
+<li><strong>Recovery</strong>: backfill/replay một ngày cụ thể.</li>
+<li><strong>Observability</strong>: run ID, structured log, freshness/volume/failure alert.</li>
+<li><strong>Security</strong>: no secret in Git, least privilege, no raw PII trong log.</li>
+<li><strong>Maintainability</strong>: module hóa, naming, docs và code review.</li>
+<li><strong>Cost</strong>: budget nhỏ, compute tắt khi không dùng, retention hợp lý.</li>
+</ul>
+<h2 id="5-repository-goi-y">5. Repository gợi ý</h2>
+<pre><code>capstone/
+  README.md
+  architecture/
+    diagram.png
+    decisions.md
+  infra/
+  ingestion/
+  spark/
+  dbt_project/
+  orchestration/
+  tests/
+  dashboards/
+  docs/
+    data_dictionary.md
+    runbook.md
+    report.md</code></pre>
+<p>README cần có quick start, dependency, config mẫu không chứa secret, cách test, deploy, rerun và teardown.</p>
+<h2 id="6-ke-hoach-trien-khai-theo-lat-cat">6. Kế hoạch triển khai theo lát cắt</h2>
+<ol>
+<li>Chốt 3 câu hỏi business và grain.</li>
+<li>Tạo một source nhỏ → Bronze, có audit.</li>
+<li>Bronze → Silver, có test và quarantine.</li>
+<li>Silver → một fact + dimensions → một KPI.</li>
+<li>Orchestrate và chạy end-to-end cho một ngày.</li>
+<li>Thêm monitoring/alert và backfill.</li>
+<li>Thêm CI/CD, security, docs.</li>
+<li>Mở rộng thêm source/KPI sau khi critical path ổn.</li>
+</ol>
+<p>Mỗi bước phải có output chạy được; tránh làm tất cả cùng lúc rồi mới integration.</p>
+<h2 id="7-acceptance-criteria">7. Acceptance criteria</h2>
+<table><thead><tr><th>Hạng mục</th><th>Tiêu chí chứng minh</th></tr></thead><tbody><tr><td>Ingestion</td><td>Có run metadata, count và raw replayable</td></tr><tr><td>Transform</td><td>Test schema/key/business rule; bad data có đường xử lý</td></tr><tr><td>Modeling</td><td>Grain/fact/dimension/KPI được ghi rõ</td></tr><tr><td>Orchestration</td><td>Dependency, retry, timeout, backfill đúng interval</td></tr><tr><td>Reliability</td><td>Chạy cùng ngày hai lần không nhân đôi</td></tr><tr><td>Monitoring</td><td>Dashboard + alert + log tra bằng run ID</td></tr><tr><td>Security</td><td>Secret scan sạch, identity/quyền được mô tả</td></tr><tr><td>Delivery</td><td>PR checks và deploy process tái lập được</td></tr><tr><td>Reporting</td><td>Dashboard có freshness timestamp và số liệu đối soát</td></tr></tbody></table>
+<h2 id="8-demo-script-10-phut">8. Demo script 10 phút</h2>
+<ol>
+<li>Nêu vấn đề business và kiến trúc (1 phút).</li>
+<li>Chạy/trigger một data interval (1 phút).</li>
+<li>Theo dõi lineage/run/log và quality gate (2 phút).</li>
+<li>Xem star schema, KPI và dashboard (2 phút).</li>
+<li>Inject một record lỗi; cho thấy quarantine/alert (1 phút).</li>
+<li>Rerun/backfill và chứng minh không duplicate (2 phút).</li>
+<li>Nêu trade-off, cost và next steps (1 phút).</li>
+</ol>
+<p>Chuẩn bị dữ liệu/demo deterministic; không phụ thuộc internet hoặc thao tác tay khó lặp lại.</p>
+<h2 id="9-failure-drill-bat-buoc">9. Failure drill bắt buộc</h2>
+<p>Chọn ít nhất ba tình huống:</p>
+<ul>
+<li>Duplicate batch sau retry.</li>
+<li>Source thêm nullable column.</li>
+<li>File incomplete/corrupt.</li>
+<li>Join làm giảm row count.</li>
+<li>Consumer/pipeline trễ SLA.</li>
+<li>Credential hết hạn hoặc sink unavailable.</li>
+</ul>
+<p>Với mỗi tình huống ghi: tín hiệu phát hiện, impact, cách cô lập, recovery, verify và phòng ngừa tái diễn.</p>
+<h2 id="10-definition-of-done">10. Definition of Done</h2>
+<ul>
+<li><span class="check"></span>Một lệnh/quy trình rõ để setup và chạy.</li>
+<li><span class="check"></span>Pipeline end-to-end chạy được trên dữ liệu mẫu.</li>
+<li><span class="check"></span>Test, audit, alert và runbook hoạt động.</li>
+<li><span class="check"></span>Backfill/replay/rerun được chứng minh.</li>
+<li><span class="check"></span>Dashboard khớp control totals.</li>
+<li><span class="check"></span>Architecture decision và limitation được ghi trung thực.</li>
+<li><span class="check"></span>Resource cloud có hướng dẫn teardown để tránh chi phí.</li>
+</ul>
+<h2 id="11-data-contract-toi-thieu-cho-capstone">11. Data contract tối thiểu cho capstone</h2>
+<table><thead><tr><th>Dataset</th><th>Grain</th><th>Key</th><th>Update pattern</th><th>SLA</th></tr></thead><tbody><tr><td>orders</td><td>một order</td><td>order_id</td><td>insert + status update</td><td>D+1 06:00</td></tr><tr><td>order_items</td><td>một item line</td><td>order_item_id</td><td>mostly append</td><td>D+1 06:00</td></tr><tr><td>customers</td><td>một current customer ở source</td><td>customer_id</td><td>mutable</td><td>D+1 06:00</td></tr><tr><td>products</td><td>một current product ở source</td><td>product_id</td><td>mutable</td><td>D+1 06:00</td></tr></tbody></table>
+<p>Ghi type, nullable, timezone, enum, delete semantics và owner cho từng field quan trọng. Đây là input để viết validation và SCD, không chỉ documentation.</p>
+<h2 id="12-reconciliation-matrix">12. Reconciliation matrix</h2>
+<p>Mỗi layer cần bằng chứng:</p>
+<pre><code>Source orders completed count
+    = Bronze distinct order keys (theo extract scope)
+    = Silver valid + quarantined/excluded có lý do
+
+Silver sum(item gross)
+    = Gold sum(gross) theo cùng date range/version</code></pre>
+<p>Không nhất thiết mọi count bằng nhau nếu có rule lọc, nhưng chênh lệch phải được giải thích bằng metric cụ thể.</p>
+<h2 id="13-technical-decisions-can-ghi">13. Technical decisions cần ghi</h2>
+<ul>
+<li>Vì sao batch thay streaming ở MVP?</li>
+<li>Vì sao partition theo order date?</li>
+<li>Vì sao chọn SCD2 cho customer/product nào?</li>
+<li>Watermark/lookback bao lâu và dựa evidence gì?</li>
+<li>RPO/RTO giả định; raw retention bao lâu?</li>
+<li>Khi quality fail, block publish hay partial success?</li>
+</ul>
+<p>Mỗi decision có context, options, choice, consequences và trigger để xem xét lại.</p>
+<h2 id="14-test-data-design">14. Test data design</h2>
+<p>Dataset demo phải chứa happy path và edge cases:</p>
+<ul>
+<li>Hai update cùng order, duplicate delivery.</li>
+<li>Customer đổi segment giữa hai lần mua.</li>
+<li>Product chưa có dimension lúc fact đến.</li>
+<li>Refund/cancel sau ngày bán.</li>
+<li>Timestamp sát nửa đêm/timezone boundary.</li>
+<li>Một record amount âm và một orphan key.</li>
+</ul>
+<p>Nếu demo chỉ có dữ liệu sạch, chưa chứng minh recovery/quality.</p>
+<h2 id="15-cau-hoi-hoi-ong-co-the-hoi">15. Câu hỏi hội đồng có thể hỏi</h2>
+<ol>
+<li><strong>Nếu source gửi lại cả file, vì sao không duplicate?</strong> Trình bày batch identity + dedup/merge key + rerun test.</li>
+<li><strong>Nếu dashboard sai, bắt đầu ở đâu?</strong> Xác nhận scope rồi trace control totals theo lineage.</li>
+<li><strong>Nếu volume tăng 10 lần?</strong> Đưa measurement/bottleneck dự kiến và scale path, không chỉ nói &quot;Spark scale&quot;.</li>
+<li><strong>Nếu xóa dữ liệu customer?</strong> Trình bày governance policy qua raw/derived/report/backup.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-16.html"><small>← Bài trước</small><b>DataOps &amp; CI/CD for Data Pipelines</b></a><a class="next" href="unit-18.html"><small>Bài tiếp →</small><b>Final Review, Report &amp; Q&amp;A</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 17 / 18</footer><script src="../assets/lesson.js"></script></body></html>

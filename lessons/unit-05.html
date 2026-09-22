@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="vi" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="DE01 Unit 5: Data Modeling &amp; Warehousing Concepts"><title>DE01 · 05 · Data Modeling &amp; Warehousing Concepts</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body data-unit="5"><header class="topbar"><a class="back" href="../index.html">← Learning Hub</a><span class="top-title">Unit 05 · Data Modeling &amp; Warehousing Concepts</span><div class="tools"><button class="print" id="print">In</button><button id="theme" aria-label="Đổi giao diện">◐</button></div></header>
+<section class="lesson-hero"><div class="lesson-hero-inner"><div class="unit">DE01 · Unit 05 / 18</div><h1>Data Modeling &amp; Warehousing Concepts</h1><p>Chuyển transaction thành mô hình phân tích có grain và lịch sử rõ ràng.</p><div class="lesson-meta"><span class="pill">DWH</span><span class="pill">Star Schema</span><span class="pill">SCD</span><span class="pill">Medallion</span></div></div><div class="progress-wrap"><div class="progress-track"><div class="progress-fill" id="courseProgress"></div></div><button class="done-btn" id="doneButton">○ Đánh dấu đã học</button></div></section>
+<div class="page"><aside class="toc"><p class="toc-title">Trong bài này</p><nav id="tocNav"></nav></aside><main class="content"><h2 id="1-muc-tieu-buoi-hoc">1. Mục tiêu buổi học</h2>
+<p>Sau buổi này cần trả lời được:</p>
+<ul>
+<li>Vì sao không nên chạy báo cáo nặng trực tiếp trên database production?</li>
+<li>Fact, dimension, grain, surrogate key và SCD là gì?</li>
+<li>Dữ liệu đi qua Bronze, Silver, Gold như thế nào?</li>
+<li>Khi dashboard sai số, kiểm tra từ lớp nào trước?</li>
+</ul>
+<h2 id="2-oltp-olap-va-data-warehouse">2. OLTP, OLAP và Data Warehouse</h2>
+<table><thead><tr><th>Nội dung</th><th>OLTP</th><th>OLAP / Data Warehouse</th></tr></thead><tbody><tr><td>Mục đích</td><td>Ghi nhận giao dịch</td><td>Phân tích và báo cáo</td></tr><tr><td>Thao tác</td><td>Nhiều <code>INSERT/UPDATE</code>, đọc ít dòng</td><td>Đọc nhiều dòng, <code>JOIN/GROUP BY</code> lớn</td></tr><tr><td>Thiết kế</td><td>Chuẩn hóa, thường row-based</td><td>Star schema, thường columnar</td></tr><tr><td>Tốc độ mong đợi</td><td>Millisecond/giao dịch</td><td>Giây đến phút/truy vấn lớn</td></tr><tr><td>Ví dụ</td><td>Tạo đơn, thanh toán</td><td>Doanh thu theo tháng/khu vực</td></tr></tbody></table>
+<p>Không chạy báo cáo lớn trên OLTP vì có thể tranh chấp CPU/I/O, tạo lock hoặc timeout, và kết quả có thể thiếu nhất quán khi dữ liệu đang thay đổi.</p>
+<h2 id="3-star-schema">3. Star schema</h2>
+<pre><code>dim_date       dim_customer       dim_product
+    \               |                 /
+                 fact_sales
+                      |
+                  dim_store</code></pre>
+<ul>
+<li><strong>Fact table</strong>: chứa sự kiện đo lường được, ví dụ một dòng hàng đã bán.</li>
+<li><strong>Dimension table</strong>: mô tả ngữ cảnh, ví dụ khách hàng, sản phẩm, ngày.</li>
+<li><strong>Measure</strong>: số có thể tổng hợp như <code>quantity</code>, <code>gross_amount</code>, <code>discount_amount</code>.</li>
+<li><strong>Grain</strong>: một dòng đại diện cho điều gì. Phải chốt grain trước khi chọn cột.</li>
+<li><strong>Surrogate key</strong>: khóa do DWH sinh, tách lịch sử DWH khỏi khóa nghiệp vụ của nguồn.</li>
+<li><strong>Conformed dimension</strong>: dimension dùng chung và có cùng ý nghĩa giữa nhiều fact/data mart.</li>
+</ul>
+<p>Ví dụ grain đúng: &quot;một dòng của <code>fact_sales</code> là một sản phẩm trong một đơn hàng&quot;. Khi đó <code>order_id + product_id</code> có thể chưa đủ nếu một sản phẩm xuất hiện nhiều dòng; cần <code>order_item_id</code>.</p>
+<h2 id="4-quy-tac-thiet-ke-co-ban">4. Quy tắc thiết kế cơ bản</h2>
+<ol>
+<li>Xác định business process: bán hàng, tồn kho, thanh toán...</li>
+<li>Tuyên bố grain bằng một câu rõ ràng.</li>
+<li>Chọn dimension mô tả đúng grain.</li>
+<li>Chọn measure; phân biệt additive, semi-additive, non-additive.</li>
+<li>Dùng surrogate key cho dimension cần lưu lịch sử.</li>
+<li>Không trộn nhiều grain trong cùng fact.</li>
+<li>Ghi rõ owner, nguồn, SLA và định nghĩa KPI.</li>
+</ol>
+<p><code>revenue = SUM(quantity * unit_price - discount)</code> chỉ đúng khi <code>unit_price</code> và <code>discount</code> ở cùng grain. Không cộng tỷ lệ phần trăm trực tiếp; thường phải tính lại từ tử số/mẫu số.</p>
+<h2 id="5-slowly-changing-dimension-scd">5. Slowly Changing Dimension (SCD)</h2>
+<table><thead><tr><th>Loại</th><th>Cách làm</th><th>Khi dùng</th></tr></thead><tbody><tr><td>Type 0</td><td>Không thay đổi</td><td>Dữ liệu bất biến</td></tr><tr><td>Type 1</td><td>Ghi đè giá trị cũ</td><td>Không cần lịch sử, sửa lỗi chính tả</td></tr><tr><td>Type 2</td><td>Thêm dòng mới</td><td>Cần báo cáo đúng theo lịch sử</td></tr><tr><td>Type 3</td><td>Thêm cột giá trị trước</td><td>Chỉ cần lịch sử rất ngắn</td></tr></tbody></table>
+<p>SCD Type 2 thường có: <code>surrogate_key</code>, <code>business_key</code>, <code>effective_from</code>, <code>effective_to</code>, <code>is_current</code>.</p>
+<p>Ví dụ khách đổi hạng Silver → Gold: không sửa dòng Silver. Đóng hiệu lực dòng cũ và thêm dòng Gold. Fact phải lookup dimension theo business key <strong>và thời điểm giao dịch</strong>.</p>
+<h2 id="6-medallion-architecture">6. Medallion architecture</h2>
+<pre><code>Sources -&gt; Bronze (raw, replayable)
+        -&gt; Silver (clean, deduplicate, conform)
+        -&gt; Gold (business model, KPI, star schema)
+        -&gt; BI / API / ML</code></pre>
+<ul>
+<li><strong>Bronze</strong>: giữ gần nguyên trạng; thêm <code>source_system</code>, <code>source_file</code>, <code>ingestion_ts</code>, <code>run_id</code>, <code>batch_id</code>.</li>
+<li><strong>Silver</strong>: ép kiểu, chuẩn hóa mã/ngày/tiền tệ, loại trùng, quarantine record lỗi.</li>
+<li><strong>Gold</strong>: fact/dimension, aggregate và KPI đã được nghiệp vụ duyệt.</li>
+</ul>
+<p>Bronze nên đủ để replay. Silver phải có kiểm tra completeness, uniqueness, validity, consistency, timeliness. Gold phải ghi rõ grain và định nghĩa KPI.</p>
+<h2 id="7-data-mart-lake-warehouse-lakehouse">7. Data mart, lake, warehouse, lakehouse</h2>
+<ul>
+<li><strong>Data lake</strong>: lưu dữ liệu nhiều định dạng với chi phí thấp; schema thường áp dụng khi đọc.</li>
+<li><strong>Data warehouse</strong>: dữ liệu có cấu trúc, mô hình phục vụ SQL/BI và quản trị chặt.</li>
+<li><strong>Data mart</strong>: phần dữ liệu theo domain, ví dụ Sales Mart; tránh mỗi team tự định nghĩa KPI riêng.</li>
+<li><strong>Lakehouse</strong>: kết hợp object storage với khả năng quản lý bảng, ACID/metadata và analytics.</li>
+</ul>
+<h2 id="8-khi-dashboard-sai-so">8. Khi dashboard sai số</h2>
+<p>Kiểm tra theo tuyến, không đoán:</p>
+<ol>
+<li>Source có đủ record không?</li>
+<li>Bronze có nhận đủ batch/file và có trùng không?</li>
+<li>Silver có lọc nhầm, join mất dòng, watermark sai không?</li>
+<li>Gold có sai grain/KPI hoặc xử lý late data chưa?</li>
+<li>Semantic model/Power BI có relationship, filter, DAX, RLS sai không?</li>
+</ol>
+<p>Luôn đối chiếu row count, tổng tiền và số khóa distinct giữa từng lớp; dùng cùng <code>run_id</code> để trace.</p>
+<h2 id="9-bai-thuc-hanh">9. Bài thực hành</h2>
+<p>Thiết kế mart bán hàng gồm <code>fact_sales</code>, <code>dim_date</code>, <code>dim_customer</code>, <code>dim_product</code>:</p>
+<ul>
+<li>Viết grain của từng bảng.</li>
+<li>Chọn natural key và surrogate key.</li>
+<li>Chọn SCD cho customer/product và giải thích lý do.</li>
+<li>Viết 3 KPI: net revenue, số đơn, average order value.</li>
+<li>Mô tả cách xử lý đơn đến muộn một ngày.</li>
+</ul>
+<h2 id="10-checklist-tu-kiem-tra">10. Checklist tự kiểm tra</h2>
+<ul>
+<li><span class="check"></span>Mỗi fact chỉ có một grain rõ ràng.</li>
+<li><span class="check"></span>Không <code>JOIN</code> gây nhân bản measure.</li>
+<li><span class="check"></span>KPI có công thức, owner và thời điểm dữ liệu mới nhất.</li>
+<li><span class="check"></span>Raw có thể replay; pipeline rerun không tạo trùng.</li>
+<li><span class="check"></span>Có test khóa, null, quan hệ và đối soát tổng.</li>
+</ul>
+<h2 id="11-worked-example-tu-oltp-sang-fact-sales">11. Worked example: từ OLTP sang <code>fact_sales</code></h2>
+<p>Nguồn OLTP:</p>
+<pre><code>orders(id, customer_id, status, created_at)
+order_items(id, order_id, product_id, quantity, unit_price, discount)
+products(id, sku, name, category_id)
+customers(id, name, segment, city)</code></pre>
+<p>Quyết định thiết kế:</p>
+<ul>
+<li>Business process: bán hàng đã hoàn tất.</li>
+<li>Grain: một dòng order item của order completed.</li>
+<li>Measures: quantity, gross amount, discount, net amount.</li>
+<li>Degenerate dimension: <code>order_id</code> có thể nằm trong fact để drill-through.</li>
+<li>Dimension keys: <code>date_key</code>, <code>customer_key</code>, <code>product_key</code> là surrogate key.</li>
+</ul>
+<pre><code>SELECT
+    oi.id AS order_item_id,
+    o.id AS order_id,
+    dd.date_key,
+    dc.customer_key,
+    dp.product_key,
+    oi.quantity,
+    oi.quantity * oi.unit_price AS gross_amount,
+    oi.discount AS discount_amount,
+    oi.quantity * oi.unit_price - oi.discount AS net_amount
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+JOIN dim_date dd ON dd.full_date = CAST(o.created_at AS DATE)
+JOIN dim_customer dc
+  ON dc.customer_id = o.customer_id
+ AND o.created_at &gt;= dc.effective_from
+ AND o.created_at &lt;  dc.effective_to
+JOIN dim_product dp ON dp.product_id = oi.product_id
+WHERE o.status = 'Completed';</code></pre>
+<p>Join dimension theo thời điểm giao dịch giúp báo cáo lịch sử không đổi khi customer đổi segment sau này.</p>
+<h2 id="12-measure-va-kha-nang-cong">12. Measure và khả năng cộng</h2>
+<ul>
+<li><strong>Additive</strong>: revenue/quantity cộng được qua mọi dimension.</li>
+<li><strong>Semi-additive</strong>: account balance cộng qua customer nhưng không cộng qua time; thường lấy cuối kỳ.</li>
+<li><strong>Non-additive</strong>: ratio/percentage; phải aggregate tử số và mẫu số rồi tính lại.</li>
+</ul>
+<p><code>AVG(order_amount)</code> tính trực tiếp trên fact order item sẽ sai grain. Trước tiên aggregate item về order, sau đó mới lấy average.</p>
+<h2 id="13-scd-type-2-tung-buoc">13. SCD Type 2 từng bước</h2>
+<p>Giả sử customer 10 đổi <code>segment</code> từ Silver sang Gold lúc <code>2026-09-22 10:00</code>:</p>
+<ol>
+<li>So sánh hash/cột tracked của incoming row với current row.</li>
+<li>Nếu không đổi: không tạo version mới.</li>
+<li>Nếu đổi: set dòng cũ <code>effective_to = change_time</code>, <code>is_current = false</code>.</li>
+<li>Insert dòng mới với surrogate key mới, <code>effective_from = change_time</code>, <code>effective_to = 9999-12-31</code>.</li>
+<li>Test mỗi business key chỉ có một current row và các khoảng không overlap.</li>
+</ol>
+<p>Delete từ source cần policy: đóng version, đánh <code>is_deleted</code>, hay giữ nguyên tùy reporting requirement. Không tự suy đoán.</p>
+<h2 id="14-late-arriving-data">14. Late-arriving data</h2>
+<ul>
+<li><strong>Late fact</strong>: đơn ngày D đến ngày D+2. Load vào partition/ngày business đúng và recompute aggregate liên quan.</li>
+<li><strong>Late dimension</strong>: fact đến trước dimension. Có thể dùng <code>unknown_key = 0</code>, rồi update fact sau khi dimension đến.</li>
+<li><strong>Correction</strong>: nguồn sửa amount quá khứ. Incremental logic phải nhìn <code>updated_at</code>, không chỉ <code>created_at</code>.</li>
+</ul>
+<p>Gold aggregate nên có recompute window theo đặc điểm trễ, ví dụ 7 ngày gần nhất, thay vì chỉ append ngày hôm nay.</p>
+<h2 id="15-loi-thiet-ke-thuong-gap">15. Lỗi thiết kế thường gặp</h2>
+<table><thead><tr><th>Lỗi</th><th>Hậu quả</th><th>Cách phát hiện</th></tr></thead><tbody><tr><td>Trộn order và order item grain</td><td>Double-count revenue</td><td>So count distinct order/item</td></tr><tr><td>Dùng natural key làm dimension key</td><td>Mất nhiều version SCD</td><td>Test business key có nhiều history row</td></tr><tr><td>Join N:N không bridge</td><td>Nhân bản measure</td><td>Reconcile trước/sau join</td></tr><tr><td>KPI không có owner</td><td>Nhiều phiên bản sự thật</td><td>KPI glossary + sign-off</td></tr><tr><td>Overwrite Silver</td><td>Mất historical truth/replay</td><td>Snapshot/version audit</td></tr></tbody></table>
+<h2 id="16-cau-hoi-co-ap-an">16. Câu hỏi có đáp án</h2>
+<ol>
+<li><strong>Vì sao grain phải viết thành câu?</strong> Để mọi cột/measure được kiểm tra có thuộc cùng mức chi tiết hay không.</li>
+<li><strong>Star khác Snowflake schema?</strong> Star giữ dimension denormalized hơn; Snowflake tách dimension thành nhiều bảng, giảm lặp nhưng tăng join.</li>
+<li><strong>SCD2 có áp dụng mọi cột không?</strong> Không; chỉ thuộc tính cần lịch sử phân tích, nếu không sẽ tạo version noise.</li>
+<li><strong>Bronze có nên sửa dữ liệu sai?</strong> Thường giữ raw và metadata; sửa/chuẩn hóa ở Silver để replay/audit.</li>
+</ol></main></div>
+<nav class="lesson-nav"><a href="unit-04.html"><small>← Bài trước</small><b>API Development with FastAPI</b></a><a class="next" href="unit-06.html"><small>Bài tiếp →</small><b>Python for Data Engineering</b></a></nav><footer>FastTrack DE01 Learning Hub · Unit 05 / 18</footer><script src="../assets/lesson.js"></script></body></html>
