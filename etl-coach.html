@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Quy trình thực hành ETL end-to-end bao phủ 18 unit của FastTrack DE01.">
+  <title>ETL Pipeline Coach · FastTrack DE01</title>
+  <link rel="stylesheet" href="assets/etl-coach.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html">← Learning Hub</a>
+    <strong>DE01 · ETL Pipeline Coach</strong>
+    <button id="print" type="button">In</button>
+    <button id="theme" type="button" aria-label="Đổi giao diện">◐</button>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Guided practice · 18 units → 1 pipeline</p>
+      <h1>Xây ETL như một Data Engineer.</h1>
+      <p class="hero-copy">Một playbook dùng chung cho file, API, database và event. Connector có thể đổi, nhưng data contract, quality gate, idempotency, reconciliation và cách vận hành vẫn giữ nguyên.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="#builder">Thiết kế pipeline →</a>
+        <a class="button ghost" href="#stages">Đi theo 14 stage</a>
+        <a class="button ghost" href="lessons/unit-17.html">Đọc Unit 17</a>
+      </div>
+    </div>
+  </section>
+
+  <main class="shell">
+    <section class="progress-panel" aria-labelledby="progressTitle">
+      <div>
+        <h2 id="progressTitle">Tiến độ pipeline của bạn</h2>
+        <p class="progress-copy" id="progressCopy">0% stage · 0/6 failure drill</p>
+        <div class="progress-track" id="progressTrack" role="progressbar" aria-label="Tiến độ ETL" aria-valuemin="0" aria-valuemax="14" aria-valuenow="0"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+      <div class="progress-number" id="progressNumber">0/14</div>
+    </section>
+
+    <section class="section" id="builder" aria-labelledby="builderTitle">
+      <div class="section-head"><div><p class="section-kicker">01 · Pipeline builder</p><h2 id="builderTitle">Chọn bối cảnh, nhận đường đi phù hợp</h2><p class="lead">Quy trình không đổi; lựa chọn này chỉ điều chỉnh cách extract, engine xử lý và đích lưu trữ.</p></div></div>
+      <div class="builder">
+        <form class="panel form-grid" aria-label="Thông tin pipeline">
+          <div class="field"><label for="source">Nguồn dữ liệu</label><select id="source"><option value="database">Database</option><option value="files">CSV / JSON / Parquet</option><option value="api">REST API</option><option value="events">Event stream</option></select></div>
+          <div class="field"><label for="target">Đích dữ liệu</label><select id="target"><option value="warehouse">Data warehouse</option><option value="lakehouse">Lakehouse</option><option value="database">Serving database</option><option value="files">Partitioned files</option></select></div>
+          <div class="field"><label for="mode">Cách lấy dữ liệu</label><select id="mode"><option value="incremental">Incremental</option><option value="full">Full load</option><option value="cdc">CDC</option><option value="stream">Streaming</option></select></div>
+          <div class="field"><label for="scale">Quy mô thực hành</label><select id="scale"><option value="small">Nhỏ / local</option><option value="medium">Vừa / production-style</option><option value="large">Lớn / distributed</option></select></div>
+        </form>
+        <aside class="panel recommendation" aria-live="polite">
+          <h3>Kiến trúc gợi ý</h3>
+          <div class="route" id="route"></div>
+          <ul id="recommendationList"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="tracksTitle">
+      <p class="section-kicker">02 · Practice tracks</p><h2 id="tracksTitle">Ba cấp, tăng độ khó có chủ đích</h2>
+      <p class="lead">Hoàn thành critical path local trước khi thêm cloud hoặc streaming. Không cần ép mọi công cụ vào cùng một tác vụ.</p>
+      <div class="track-grid">
+        <article class="track"><small>Cấp 1 · Bắt buộc</small><h3>Local ETL</h3><p>Chứng minh dữ liệu đúng và rerun an toàn.</p><ul><li>CSV/API/SQLite → Python/SQL</li><li>Bronze, Silver, Gold</li><li>Watermark, quarantine, test</li><li>SQLite hoặc PostgreSQL đích</li></ul></article>
+        <article class="track"><small>Cấp 2 · Bắt buộc</small><h3>Production-style Batch</h3><p>Chứng minh pipeline vận hành và phục hồi được.</p><ul><li>Airflow hoặc ADF</li><li>dbt, reconciliation, backfill</li><li>Monitoring, alert, runbook</li><li>Git workflow và CI/CD</li></ul></article>
+        <article class="track"><small>Cấp 3 · Mở rộng</small><h3>Azure & Streaming</h3><p>Thay adapter để thực hành scale và near real-time.</p><ul><li>ADLS, ADF, identity/RBAC</li><li>Spark khi dữ liệu đủ lớn</li><li>Event Hubs/checkpoint/watermark</li><li>Azure Monitor và cost control</li></ul></article>
+      </div>
+    </section>
+
+    <section class="section" id="stages" aria-labelledby="stagesTitle">
+      <div class="section-head"><div><p class="section-kicker">03 · Universal ETL playbook</p><h2 id="stagesTitle">14 stage từ yêu cầu đến demo</h2><p class="lead">Chỉ đánh dấu hoàn thành khi có artifact và bằng chứng vượt quality gate, không chỉ vì đã đọc.</p></div></div>
+      <div class="stage-list" id="stageList"></div>
+    </section>
+
+    <section class="section" aria-labelledby="drillsTitle">
+      <p class="section-kicker">04 · Failure lab</p><h2 id="drillsTitle">Pipeline phải được thử trong điều kiện xấu</h2>
+      <p class="lead">Với mỗi drill, ghi đủ: tín hiệu phát hiện → impact → cô lập → recovery → verify → phòng ngừa.</p>
+      <div class="drill-grid" id="drillList"></div>
+    </section>
+
+    <section class="section" aria-labelledby="coverageTitle">
+      <p class="section-kicker">05 · Course coverage</p><h2 id="coverageTitle">Mapping đủ 18 unit DE01</h2>
+      <p class="lead">Nhấp vào unit để quay lại phần lý thuyết khi gặp một stage chưa chắc.</p>
+      <div class="coverage-wrap"><table class="coverage"><thead><tr><th>Unit</th><th>Kiến thức</th><th>Áp dụng tại stage</th></tr></thead><tbody id="coverageBody"></tbody></table></div>
+    </section>
+
+    <section class="section" aria-labelledby="rubricTitle">
+      <p class="section-kicker">06 · Readiness rubric</p><h2 id="rubricTitle">Tự chấm bằng evidence, không chấm theo cảm giác</h2>
+      <p class="lead">Kéo điểm trong giới hạn từng hạng mục. Nếu chưa có log, test result, screenshot hoặc report chứng minh thì chưa nên cho điểm tối đa.</p>
+      <div class="panel">
+        <div class="rubric" id="rubricList"></div>
+        <div class="score-card"><div class="score-total" id="scoreTotal">0/100</div><div><h3>DE01 pipeline readiness</h3><p id="scoreMessage">Tiếp tục theo thứ tự stage; ưu tiên correctness trước khi thêm công nghệ.</p></div></div>
+      </div>
+    </section>
+
+    <div class="reset-row"><span id="updatedAt">Tiến độ được lưu cục bộ trên trình duyệt này.</span><button class="danger" id="reset" type="button">Xóa tiến độ ETL Coach</button></div>
+  </main>
+
+  <footer>FastTrack DE01 Learning Hub · ETL Pipeline Coach · Dữ liệu tiến độ chỉ lưu trong localStorage.</footer>
+  <script src="assets/etl-coach-state.js"></script>
+  <script src="assets/etl-coach-app.js"></script>
+</body>
+</html>

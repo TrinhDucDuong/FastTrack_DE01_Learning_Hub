@@ -5,6 +5,7 @@ Website tự học Data Engineering gồm 18 bài, đi từ Git, Python, SQL và
 ## Tính năng
 
 - 18 bài học chi tiết với mục lục và điều hướng trước/sau.
+- ETL Pipeline Coach nối 18 unit thành quy trình thực hành 14 stage, có pipeline builder, failure drill, course mapping và rubric 100 điểm.
 - Tìm kiếm toàn bộ chương trình từ trang chính.
 - Đánh dấu tiến độ học bằng localStorage trên từng trình duyệt.
 - Ngân hàng 360 câu hỏi: 20 câu cho từng unit, đủ ba mức độ.
@@ -14,6 +15,6 @@ Website tự học Data Engineering gồm 18 bài, đi từ Git, Python, SQL và
 - Dark mode, responsive và hỗ trợ in/lưu PDF.
 - Website tĩnh, không thu thập dữ liệu cá nhân và không cần backend.
 
-Tiến độ bài học dùng khóa `de01-progress`; trạng thái quiz và lịch sử dùng `de01-quiz-state-v1`. Tất cả chỉ nằm trong localStorage của đúng trình duyệt/thiết bị đang sử dụng, không đồng bộ lên GitHub hay thiết bị khác.
+Tiến độ bài học dùng khóa `de01-progress`; trạng thái quiz và lịch sử dùng `de01-quiz-state-v1`; ETL Pipeline Coach dùng `de01-etl-coach-v1`. Tất cả chỉ nằm trong localStorage của đúng trình duyệt/thiết bị đang sử dụng, không đồng bộ lên GitHub hay thiết bị khác.
 
 Mở `index.html` hoặc truy cập GitHub Pages của repository này.

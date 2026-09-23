@@ -168,6 +168,10 @@
     .milestone { padding: 1rem; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.2); border-radius: 12px; }
     .milestone::before { counter-increment: step; content: counter(step, decimal-leading-zero); display: block; color: #ffd166; font-weight: 900; }
 
+    .coach-callout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: center; margin: 2rem 0; padding: clamp(1.2rem, 4vw, 2rem); background: color-mix(in srgb, var(--gold) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--line)); border-radius: var(--radius); }
+    .coach-callout h2 { margin: .2rem 0 .5rem; }
+    .coach-callout p { max-width: 760px; margin: 0; color: var(--muted); }
+
     .empty { display: none; padding: 2rem; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); }
     .empty.show { display: block; }
     footer { padding: 2.5rem 1rem 4rem; text-align: center; color: var(--muted); }
@@ -196,6 +200,7 @@
       .unit-badge { width: 44px; height: 44px; border-radius: 12px; }
       .complete { grid-column: 1 / -1; width: 100%; }
       .stats, .milestones { grid-template-columns: 1fr; }
+      .coach-callout { grid-template-columns: 1fr; }
       .schema { grid-template: "fact" "date" "customer" "product" "store" / 1fr; }
       .incident { grid-template-columns: repeat(2, 1fr); }
     }
@@ -229,6 +234,7 @@
       <a class="button" href="lessons/unit-01.html">Mở bài học chi tiết đầu tiên</a>
       <a class="button" href="quiz.html">Vào chế độ kiểm tra</a>
       <a class="button" href="progress.html">Kết quả &amp; thống kê</a>
+      <a class="button" href="etl-coach.html">Thực hành ETL Pipeline</a>
     </div>
     <div class="stats">
       <div class="stat"><strong>18</strong><span>Unit từ nền tảng đến capstone</span></div>
@@ -410,6 +416,11 @@
           <div class="module-foot"><a class="note-link" href="lessons/unit-18.html">Vào bài học chi tiết →</a><span class="question">Tự hỏi: limitation lớn nhất của project là gì?</span></div>
         </article>
       </div>
+
+      <section class="coach-callout" aria-labelledby="coach-title">
+        <div><p class="section-kicker">Guided practice</p><h2 id="coach-title">ETL Pipeline Coach</h2><p>Biến kiến thức của 18 unit thành một pipeline hoàn chỉnh: chọn bối cảnh, đi qua 14 stage, lưu checklist, luyện failure drill và tự chấm readiness trên 100 điểm.</p></div>
+        <a class="button primary" href="etl-coach.html">Mở ETL Coach →</a>
+      </section>
 
       <section class="capstone" aria-labelledby="capstone-title">
         <p class="section-kicker" style="color:#ffd166">Build order</p>
